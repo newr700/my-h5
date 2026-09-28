@@ -25,3 +25,21 @@ export interface OrderItem {
   amount: number
   status: 'pending' | 'paid' | 'closed'
 }
+
+/** 积分榜球队条目 */
+export interface TeamStanding {
+  /** 排名（1-20） */
+  rank: number
+  teamName: string
+  /** 已赛轮次 */
+  played: number
+  win: number
+  draw: number
+  lose: number
+  /** 进球数 */
+  goalsFor: number
+  /** 失球数 */
+  goalsAgainst: number
+  /** 积分 */
+  points: number
+}

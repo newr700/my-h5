@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import userRoutes from './modules/user'
 import orderRoutes from './modules/order'
+import standingsRoutes from './modules/standings'
 
 /**
  * 路由总表 —— 各模块的路由在 modules/ 下各自维护，
@@ -12,7 +13,8 @@ const router = createRouter({
   routes: [
     { path: '/', redirect: '/user' },
     ...userRoutes,
-    ...orderRoutes
+    ...orderRoutes,
+    ...standingsRoutes
   ]
 })
 
