@@ -6,6 +6,9 @@
  * 两人项目先求快，这个体积完全可接受；
  * 将来做「构建优化」时换成按需引入（unplugin-vue-components），
  * 用到的组件才会进包，预计能砍掉一半体积。这是清单里已预留的升级路径。
+ *
+ * （技能点：应用入口与插件机制——app.use() 背后就是 Vue 的插件规范，
+ *  一个带 install 方法的对象；面试问"Vue 插件怎么写"就答这里）
  */
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'

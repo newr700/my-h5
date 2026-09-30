@@ -16,6 +16,9 @@ import { isPlainObject } from '@/utils/validate'
  * 写死意味着每次发版都要改代码，漏改就是事故。
  * 环境变量让“代码”和“环境”分离 —— 清单「环境变量管理」条目。
  */
+// ── 面试技能点（详见 docs/面试技能树.md）──────────────────
+// 本文件：Axios 封装 / 拦截器 / Promise / HTTP 头与鉴权 / Partial<T>
+// 考点速记：为什么全项目只此一个实例？拦截器按什么顺序执行？
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   // 超时：10 秒拿不到响应就主动断开。
@@ -23,7 +26,7 @@ const request = axios.create({
   timeout: 10000
 })
 
-// 请求拦截：自动带上 token。
+// 请求拦截：自动带上 token。（技能点：Axios 拦截器 / HTTP 无状态与鉴权）
 // 为什么每次都带？因为 HTTP 无状态，服务器不记得上一个请求是谁发的，
 // token 相当于每次调用都随身携带的「身份证明」（类比：每次都传 context 结构体指针）
 request.interceptors.request.use((config) => {
@@ -52,6 +55,7 @@ request.interceptors.response.use(
 
     // Partial<> 表示「每个字段都可能有也可能没有」——这正是我们要检查的事情，
     // 所以这里不能用 ApiResponse 直接断言，那等于先假设它就是对的
+    // （技能点：TS utility types——Partial 的实战用法，面试爱问）
     const shell = res as Partial<ApiResponse>
 
     if (typeof shell.code !== 'number') {
@@ -86,6 +90,7 @@ request.interceptors.response.use(
  * 注意：这里的 as unknown as T 不是“转换”而是“承诺”——
  * T 说的是「后端应该给我什么」。承诺靠不靠得住，
  * 由各模块 api 文件里的 parse 函数（运行时校验）保证，不靠这两行。
+ * （技能点：TS 泛型与类型断言——unknown 和 any 的区别是高频考题）
  */
 export async function get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
   return (await request.get(url, config)) as unknown as T

@@ -7,6 +7,11 @@ import type { TeamStanding } from '@/types/api'
  *
  * ② 接口层：页面不许直接写 axios，所有请求都收敛成这样的函数。
  *
+ * ── 面试技能点（详见 docs/面试技能树.md T0/T4）────────────
+ * 本文件：unknown 渐进收窄 / 泛型传参 / RESTful 路径设计
+ * 考点速记：为什么用 get<unknown> 而不是 get<TeamStanding[]>？
+ * （答：后者是口头信任，前者配合 parse 才是"先检查再使用"）
+ *
  * ── 关键：get 的泛型只是一句「我猜它长这样」 ──────────────────
  * 以前写的是 get<TeamStanding[]>，等于无条件信任后端。
  * 正确写法：先当它是 unknown（我不知道它长什么样），

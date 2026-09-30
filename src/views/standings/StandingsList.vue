@@ -2,6 +2,11 @@
 /**
  * ① 页面层：只负责「展示」和「用户交互」。
  * 数据从 store 拿（③），请求由 api 层发（②），这里不出现 axios。
+ *
+ * ── 面试技能点（详见 docs/面试技能树.md T1/T2/T5）────────
+ * 本文件：组合式 API / ref+computed / onMounted 生命周期 /
+ *         v-if 与 v-for / :key 选择 / computed 缓存 / scoped CSS / Vant 组件
+ *
  * ── 为什么页面不许发请求 ────────────────────────────────
  * 页面是整个项目里更换最频繁的文件（改版、加功能都先动它）。
  * 如果请求逻辑长在页面里，改版时就会顺手把业务逻辑一起丢掉；
@@ -20,6 +25,7 @@ import type { TeamStanding } from '@/types/api'
 const standingsStore = useStandingsStore()
 
 // ── 三态判定（读法：这个页面此刻长什么样，一眼能看出来）──────
+// （技能点：computed 计算属性——依赖不变就不重算，有缓存；这是它和普通函数的区别）
 /** 状态一：首次加载中 —— 页面一条数据都没有，正在拉取 → 骨架屏 */
 const isInitialLoading = computed(
   () => standingsStore.loading && standingsStore.standings.length === 0
@@ -36,6 +42,7 @@ const isEmpty = computed(
 )
 
 // 首次进入：失败不用弹 toast——错误会占据整个屏幕，没人看不见。
+// （技能点：生命周期 onMounted——DOM 挂载后才发请求，保证渲染和取数并行不阻塞）
 // catch(() => {}) 不是吞错误：store 已经把原因写进 error 了，
 // 这里只是告诉 Vue「我知道这个 Promise 会失败，别往控制台抛未处理告警」
 onMounted(() => {

@@ -6,6 +6,10 @@ import type { TeamStanding } from '@/types/api'
 /**
  * 积分榜模块状态（样例模块，供参考模仿）
  *
+ * ── 面试技能点（详见 docs/面试技能树.md）──────────────────
+ * 本文件：Pinia setup store 写法 / async-await / try-catch-finally / computed 切片
+ * 考点速记：Pinia 和 Vuex 的区别？为什么选 setup 写法（TS 推断更友好）？
+ *
  * ── 清单落地：列表三态 ──────────────────────────────────
  * 一个「能上线」的列表页必须处理三种状态：
  *   1. 加载中（loading）    —— 首次进入，页面还没数据 → 骨架屏

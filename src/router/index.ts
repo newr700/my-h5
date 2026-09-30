@@ -16,6 +16,9 @@ import standingsRoutes from './modules/standings'
  * 代价是 URL 不够优雅（/#/standings）。
  * 若将来要改成 history 模式获得干净 URL，
  * 服务器必须补一条“所有路径都返回 index.html”的重写规则，别忘了。
+ *
+ * （技能点：vue-router 双模式原理——hash 靠 location.hash 不发请求，
+ *  history 靠 pushState 需要 server 配合；面试高频对比题）
  */
 const router = createRouter({
   history: createWebHashHistory(),

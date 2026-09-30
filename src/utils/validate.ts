@@ -50,7 +50,9 @@ function fail(path: string, expected: string, actual: unknown, fallback?: unknow
   throw new Error(message)
 }
 
-/** 是不是一个普通对象（typeof null 和数组也都是 'object'，所以要排掉） */
+/** 是不是一个普通对象（typeof null 和数组也都是 'object'，所以要排掉）
+ * （技能点：TS 类型守卫——raw is Record<string, unknown> 的返回值写法，
+ *  能让 TS 在 if 之后自动收窄类型，这是 any 做不到的） */
 export function isPlainObject(raw: unknown): raw is Record<string, unknown> {
   return typeof raw === 'object' && raw !== null && !Array.isArray(raw)
 }
