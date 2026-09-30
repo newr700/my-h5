@@ -34,13 +34,21 @@ const mockStandings: TeamStanding[] = [
 export const useStandingsStore = defineStore('standings', () => {
   const standings = ref<TeamStanding[]>([])
   const loading = ref(false)
+  /** 失败原因 —— 契约校验的错误信息也会出现在这里 */
+  const error = ref('')
 
   async function loadStandings() {
     loading.value = true
+    error.value = ''
     try {
       standings.value = await fetchStandings()
-    } catch {
-      // 后端没起 / 请求失败时，用假数据兜底，页面照常渲染
+    } catch (err) {
+      // 【这里有个坑，你们一定要知道】
+      // 下面那句「用假数据兜底」会把真实错误彻底遮住：
+      // 页面看着一切正常，其实数据全是假的，真到了线上没人知道接口早就坏了。
+      // 所以兜底之前必须先把错误存进 error 并打到控制台 —— 看不见的错误才是最可怕的。
+      error.value = err instanceof Error ? err.message : String(err)
+      console.error('[standings] 加载失败：', error.value)
       standings.value = mockStandings
     } finally {
       loading.value = false
@@ -55,6 +63,7 @@ export const useStandingsStore = defineStore('standings', () => {
   return {
     standings,
     loading,
+    error,
     loadStandings,
     championsLeagueZone,
     europaLeagueZone,

@@ -27,6 +27,9 @@ function rankBadgeClass(team: TeamStanding) {
 
 <template>
   <div class="page">
+    <!-- 加载失败 / 契约校验失败时显示，开发环境排查全靠它 -->
+    <div v-if="standingsStore.error" class="alert">{{ standingsStore.error }}</div>
+
     <!-- 草图要求：标题加粗 -->
     <header class="title">当前积分排名</header>
 
@@ -82,6 +85,16 @@ function rankBadgeClass(team: TeamStanding) {
 .page {
   min-height: 100vh;
   background: #ffffff;
+}
+
+/* 错误提示条：契约校验失败时会在页面顶部显红 */
+.alert {
+  padding: 8px 12px;
+  background: #fff1f0;
+  color: #d43e3e;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
 }
 
 .title {

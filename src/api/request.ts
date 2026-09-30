@@ -1,5 +1,6 @@
 import axios, { AxiosError, type AxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '@/types/api'
+import { isPlainObject } from '@/utils/validate'
 
 /**
  * axios 唯一出口 —— 全项目不许在别处 new axios 实例。
@@ -24,12 +25,32 @@ request.interceptors.request.use((config) => {
 request.interceptors.response.use(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (response): any => {
-    const res = response.data as ApiResponse
-    if (res.code !== 0) {
-      // 业务错误在这里统一抛出，页面层 catch 即可
-      return Promise.reject(new Error(res.message || '请求失败'))
+    const res = response.data
+
+    // 先校验外壳本身。以前直接写 res.code !== 0 有个坑：
+    // 后端忘了返回 code 时，undefined !== 0 也成立，页面只看到一句莫名其妙的「请求失败」
+    // 现在能明确告诉你到底是外壳的哪个字段出了问题
+    if (!isPlainObject(res)) {
+      return Promise.reject(
+        new Error(`[契约校验] 响应应该是一个对象，实际收到 ${String(res)?.slice(0, 120)}`)
+      )
     }
-    return res.data
+
+    // Partial<> 表示「每个字段都可能有也可能没有」——这正是我们要检查的事情，
+    // 所以这里不能用 ApiResponse 直接断言，那等于先假设它就是对的
+    const shell = res as Partial<ApiResponse>
+
+    if (typeof shell.code !== 'number') {
+      return Promise.reject(new Error(`[契约校验] 响应缺少数字类型的 code 字段，实际是 ${String(shell.code)}`))
+    }
+    if (shell.code !== 0) {
+      // 业务错误在这里统一抛出，页面层 catch 即可
+      return Promise.reject(new Error(shell.message || '请求失败'))
+    }
+    if (shell.data === undefined) {
+      return Promise.reject(new Error('[契约校验] 响应缺少 data 字段'))
+    }
+    return shell.data
   },
   (error: AxiosError) => {
     // 网络错误 / HTTP 非 2xx
