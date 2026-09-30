@@ -4,14 +4,28 @@ import { isPlainObject } from '@/utils/validate'
 
 /**
  * axios 唯一出口 —— 全项目不许在别处 new axios 实例。
- * 鉴权、错误提示、响应结构拆包，全部在这里统一处理。
+ *
+ * ── 为什么要“唯一” ─────────────────────────────────────
+ * 如果各页面自己 import axios 各发各的，那么「带 token、拆外壳、统一报错」
+ * 这些规矩就得在每个页面重复写一遍，改一处忘一处。
+ * 收敛成唯一实例后，规矩只需要定一次，全项目自动生效 ——
+ * 这就是清单里「全局资源收敛到唯一位置」在代码层的落点。
+ *
+ * ── 为什么 baseURL 从 .env 读而不是写死 ─────────────────
+ * 开发时接口在 localhost:3000，上线后在真实域名；
+ * 写死意味着每次发版都要改代码，漏改就是事故。
+ * 环境变量让“代码”和“环境”分离 —— 清单「环境变量管理」条目。
  */
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
+  // 超时：10 秒拿不到响应就主动断开。
+  // 没有超时的请求在断网时会永远挂着，loading 转圈转到天荒地老 —— C 世界不存在的问题
   timeout: 10000
 })
 
-// 请求拦截：自动带上 token
+// 请求拦截：自动带上 token。
+// 为什么每次都带？因为 HTTP 无状态，服务器不记得上一个请求是谁发的，
+// token 相当于每次调用都随身携带的「身份证明」（类比：每次都传 context 结构体指针）
 request.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
@@ -53,11 +67,26 @@ request.interceptors.response.use(
     return shell.data
   },
   (error: AxiosError) => {
-    // 网络错误 / HTTP 非 2xx
+    // 网络错误 / HTTP 非 2xx：原样往外抛，让页面层决定怎么提示。
+    // 这里不弹 toast 的原因：列表页和表单页对错误的呈现方式完全不同
+    // （全屏错误态 vs 输入框旁红字），请求层不该越权替页面做决定
     return Promise.reject(error)
   }
 )
 
+/**
+ * get / post：给 request 套上泛型的薄封装。
+ *
+ * 为什么不直接用 request.get？
+ * 1. 业务代码只 import 这两个函数，永远碰不到 request 实例本身，
+ *    「唯一出口」的约束靠这个才真正成立；
+ * 2. 泛型 T 由调用方填写后，返回值直接是 Promise<T>，
+ *    页面/store 里不需要再写 as 断言。
+ *
+ * 注意：这里的 as unknown as T 不是“转换”而是“承诺”——
+ * T 说的是「后端应该给我什么」。承诺靠不靠得住，
+ * 由各模块 api 文件里的 parse 函数（运行时校验）保证，不靠这两行。
+ */
 export async function get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
   return (await request.get(url, config)) as unknown as T
 }
