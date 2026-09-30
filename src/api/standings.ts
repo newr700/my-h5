@@ -35,7 +35,10 @@ function parseStanding(raw: unknown, index: number): TeamStanding {
     goalsFor: asNumber(raw.goalsFor, at('goalsFor')),
     goalsAgainst: asNumber(raw.goalsAgainst, at('goalsAgainst')),
     // 积分错了整张榜都是错的，这种核心数据必须用严格模式（不给兜底值）
-    points: asNumber(raw.points, at('points'))
+    points: asNumber(raw.points, at('points')),
+    // 队徽是展示类次要字段：后端暂时没返回，所以用宽松模式。
+    // 缺失时静默兜底成 ''，页面显示排名圆圈；将来后端补了 logoUrl 字段，这里一行不用改
+    logoUrl: asString(raw.logoUrl, at('logoUrl'), '')
   }
 }
 

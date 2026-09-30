@@ -42,4 +42,10 @@ export interface TeamStanding {
   goalsAgainst: number
   /** 积分 */
   points: number
+  /**
+   * 队徽图片地址 —— 注意类型文件描述的是「parse 归一化后的形状」，不是后端原文。
+   * 后端给没给这个字段不确定（所以 parse 时用宽松模式），
+   * 但我们保证归一化后它一定是 string：没图就是 ''，页面据此决定显示图片还是排名圆圈。
+   */
+  logoUrl: string
 }

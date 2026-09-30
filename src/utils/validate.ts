@@ -32,11 +32,19 @@ function warnOnce(message: string): void {
   }
 }
 
-/** 失败时的统一出口：给了兜底值就走宽松模式，没给就严格抛错 */
+/**
+ * 失败时的统一出口：给了兜底值就走宽松模式，没给就严格抛错
+ *
+ * 宽松模式再细分两种：
+ * - 字段缺失（undefined / null）：这是「可选字段」的正常情况，静默用兜底值
+ * - 字段存在但类型不对：后端可能改错了，开发环境必须告警
+ */
 function fail(path: string, expected: string, actual: unknown, fallback?: unknown): never | unknown {
   const message = `[契约校验] ${path} 应该是 ${expected}，实际收到 ${describe(actual)}`
   if (fallback !== undefined) {
-    warnOnce(`${message}，已用兜底值代替`)
+    if (actual !== undefined && actual !== null) {
+      warnOnce(`${message}，已用兜底值代替`)
+    }
     return fallback
   }
   throw new Error(message)

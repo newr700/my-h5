@@ -4,54 +4,57 @@ import { fetchStandings } from '@/api/standings'
 import type { TeamStanding } from '@/types/api'
 
 /**
- * 后端还没起，先用假数据顶上，页面可以正常开发。
- * 联调后删掉这个常量和 loadStandings 里 catch 的兜底即可。
+ * 积分榜模块状态（样例模块，供参考模仿）
+ *
+ * ── 清单落地：列表三态 ──────────────────────────────────
+ * 一个「能上线」的列表页必须处理三种状态：
+ *   1. 加载中（loading）    —— 首次进入，页面还没数据 → 骨架屏
+ *   2. 加载失败（error）    —— 没数据可用时 → 全屏错误 + 重试按钮
+ *   3. 有数据（standings）  —— 正常渲染
+ * 另有第四种：刷新中（refreshing）—— 已有数据时重新拉取，不打断浏览
+ *
+ * ── 关于「假数据兜底」 ─────────────────────────────────
+ * 之前 catch 里塞了 mockStandings 让页面永远有东西可看。
+ * 现在后端已跑通，按清单「错误必须可感知」的要求删掉了：
+ * 接口坏了就堂堂正正显示错误态，而不是拿假数据骗人。
+ * （想恢复临时开发用，git 历史里能找回，但别带到生产。）
  */
-const mockStandings: TeamStanding[] = [
-  { rank: 1, teamName: '球队1', played: 9, win: 9, draw: 0, lose: 0, goalsFor: 20, goalsAgainst: 2, points: 27 },
-  { rank: 2, teamName: '球队2', played: 9, win: 7, draw: 1, lose: 1, goalsFor: 18, goalsAgainst: 6, points: 22 },
-  { rank: 3, teamName: '球队3', played: 9, win: 6, draw: 2, lose: 1, goalsFor: 15, goalsAgainst: 7, points: 20 },
-  { rank: 4, teamName: '球队4', played: 9, win: 6, draw: 1, lose: 2, goalsFor: 14, goalsAgainst: 8, points: 19 },
-  { rank: 5, teamName: '球队5', played: 9, win: 5, draw: 3, lose: 1, goalsFor: 13, goalsAgainst: 7, points: 18 },
-  { rank: 6, teamName: '球队6', played: 9, win: 5, draw: 2, lose: 2, goalsFor: 12, goalsAgainst: 9, points: 17 },
-  { rank: 7, teamName: '球队7', played: 9, win: 5, draw: 1, lose: 3, goalsFor: 12, goalsAgainst: 10, points: 16 },
-  { rank: 8, teamName: '球队8', played: 9, win: 4, draw: 3, lose: 2, goalsFor: 11, goalsAgainst: 9, points: 15 },
-  { rank: 9, teamName: '球队9', played: 9, win: 4, draw: 2, lose: 3, goalsFor: 11, goalsAgainst: 11, points: 14 },
-  { rank: 10, teamName: '球队10', played: 9, win: 4, draw: 1, lose: 4, goalsFor: 10, goalsAgainst: 12, points: 13 },
-  { rank: 11, teamName: '球队11', played: 9, win: 3, draw: 3, lose: 3, goalsFor: 9, goalsAgainst: 10, points: 12 },
-  { rank: 12, teamName: '球队12', played: 9, win: 3, draw: 2, lose: 4, goalsFor: 9, goalsAgainst: 12, points: 11 },
-  { rank: 13, teamName: '球队13', played: 9, win: 3, draw: 1, lose: 5, goalsFor: 8, goalsAgainst: 13, points: 10 },
-  { rank: 14, teamName: '球队14', played: 9, win: 2, draw: 4, lose: 3, goalsFor: 8, goalsAgainst: 11, points: 10 },
-  { rank: 15, teamName: '球队15', played: 9, win: 2, draw: 3, lose: 4, goalsFor: 7, goalsAgainst: 12, points: 9 },
-  { rank: 16, teamName: '球队16', played: 9, win: 2, draw: 2, lose: 5, goalsFor: 7, goalsAgainst: 14, points: 8 },
-  { rank: 17, teamName: '球队17', played: 9, win: 2, draw: 1, lose: 6, goalsFor: 6, goalsAgainst: 15, points: 7 },
-  { rank: 18, teamName: '球队18', played: 9, win: 1, draw: 3, lose: 5, goalsFor: 5, goalsAgainst: 13, points: 6 },
-  { rank: 19, teamName: '球队19', played: 9, win: 1, draw: 1, lose: 7, goalsFor: 4, goalsAgainst: 17, points: 4 },
-  { rank: 20, teamName: '球队20', played: 9, win: 0, draw: 2, lose: 7, goalsFor: 3, goalsAgainst: 19, points: 2 }
-]
-
-/** 积分榜模块状态（样例模块，供参考模仿） */
 export const useStandingsStore = defineStore('standings', () => {
   const standings = ref<TeamStanding[]>([])
+  /** 首次加载中：页面一条数据都还没有 */
   const loading = ref(false)
-  /** 失败原因 —— 契约校验的错误信息也会出现在这里 */
+  /** 下拉刷新中：已有数据，正在更新 */
+  const refreshing = ref(false)
+  /** 仅在「没有任何数据可用」时展示（首次加载失败的完整原因） */
   const error = ref('')
 
-  async function loadStandings() {
-    loading.value = true
-    error.value = ''
+  /**
+   * 加载积分榜。
+   * 约定：无论成功失败都会把状态写进上面的 ref，然后把异常继续抛给调用方，
+   * 由页面层决定怎么呈现（首次失败走全屏错误态；刷新失败走轻提示）。
+   */
+  async function loadStandings(): Promise<void> {
+    const firstTime = standings.value.length === 0
+    if (firstTime) {
+      loading.value = true
+      error.value = ''
+    } else {
+      refreshing.value = true
+    }
     try {
       standings.value = await fetchStandings()
     } catch (err) {
-      // 【这里有个坑，你们一定要知道】
-      // 下面那句「用假数据兜底」会把真实错误彻底遮住：
-      // 页面看着一切正常，其实数据全是假的，真到了线上没人知道接口早就坏了。
-      // 所以兜底之前必须先把错误存进 error 并打到控制台 —— 看不见的错误才是最可怕的。
-      error.value = err instanceof Error ? err.message : String(err)
-      console.error('[standings] 加载失败：', error.value)
-      standings.value = mockStandings
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('[standings] 加载失败：', msg)
+      if (firstTime) {
+        // 首次就失败：页面没有任何数据，错误必须占据整个屏幕让人看见
+        error.value = msg
+      }
+      // 已有数据时刷新失败：不动 error，交给页面弹轻提示，不打断用户浏览
+      throw err
     } finally {
       loading.value = false
+      refreshing.value = false
     }
   }
 
@@ -60,13 +63,20 @@ export const useStandingsStore = defineStore('standings', () => {
   const europaLeagueZone = computed(() => standings.value.slice(6, 17))
   const relegationZone = computed(() => standings.value.slice(17, 20))
 
+  /** 副标题：取第一条的已赛轮次，如「第 9 轮战罢」 */
+  const roundSummary = computed(() =>
+    standings.value.length > 0 ? `第 ${standings.value[0].played} 轮战罢` : ''
+  )
+
   return {
     standings,
     loading,
+    refreshing,
     error,
     loadStandings,
     championsLeagueZone,
     europaLeagueZone,
-    relegationZone
+    relegationZone,
+    roundSummary
   }
 })
