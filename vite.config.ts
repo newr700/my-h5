@@ -21,8 +21,16 @@ export default defineConfig({
   css: {
     postcss: {
       plugins: [
-        // 按 375 设计稿直接写 px，构建时自动转 vw，适配所有手机
-        pxToViewport({
+      // 按 375 设计稿直接写 px，构建时自动转 vw，适配所有手机
+      //
+      // ⚠️ 【依赖健康度警告】（2026-10-03 补充，详见 docs/ADR-001-移动端适配方案.md）
+      // 该插件是社区 fork，最后发版 2024-03，已两年多未更新；
+      // 原版 postcss-px-to-viewport（evrone）更早停更且基于 PostCSS 7 API。
+      // 为什么还留着：它只在构建期做「px → vw」的文本替换，产物是纯 CSS，
+      // 不进入运行时、不污染业务代码，换掉它只需改这一段配置 —— 逃生成本极低。
+      // 什么时候必须换：需要在平板/PC 上限制最大宽度时（纯 vw 会无限放大），
+      // 换 postcss-mobile-forever（活跃维护，原生支持 maxWidth 与桌面居中）。
+      pxToViewport({
           unitToConvert: 'px',
           viewportWidth: 375,
           unitPrecision: 5,
