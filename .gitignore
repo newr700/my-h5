@@ -1,0 +1,19 @@
+# 构建产物
+target/
+*.class
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# 本地密钥配置（真实密码放这里，永不进 Git —— 工程手册第 6 章）
+application-local.yml
+
+# 日志
+*.log

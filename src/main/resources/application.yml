@@ -1,0 +1,21 @@
+# 主配置：与环境无关的项放这里；差异项放 application-dev.yml / application-prod.yml
+spring:
+  application:
+    name: my-h5-server
+  profiles:
+    active: dev
+  # 时间格式全局裁定（工程手册 4.3）：对外一律字符串 "yyyy-MM-dd HH:mm:ss"，东八区
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+server:
+  port: 8080
+
+# Actuator：只暴露 health。
+# 暴露 env/metrics 等端点会泄漏配置（含密钥）——这是真实安全事故的高发点
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

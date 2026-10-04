@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Spring Boot 3.5.16：3.x 最后一条线的最终补丁（选型理由见 my-h5-app/docs/后端架构与上线全流程路线.md 2.1 节） -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.16</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.myh5</groupId>
+    <artifactId>my-h5-server</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>my-h5-server</name>
+    <description>my-h5-app 的 Java 后端</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <!-- 版本号统一收敛在这里（工程手册第 8 章：依赖引入原则） -->
+        <knife4j.version>4.5.0</knife4j.version>
+    </properties>
+
+    <dependencies>
+        <!-- Web MVC：同步阻塞模型，一个请求一个线程（不选 WebFlux 的理由见选型文档 1.2） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- 参数校验：@NotNull 等注解，「前后端双校验」的后端一半 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <!-- 探活与指标：/actuator/health -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- 接口文档。注意：Spring Boot 3 必须用带 -jakarta- 的坐标，否则 ClassNotFoundException -->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+            <version>${knife4j.version}</version>
+        </dependency>
+        <!-- 编译期消除样板代码（注解处理器改 AST，不是反射） -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ===== 按阶段引入（工程手册第 8 章），以下届时再加 ===== -->
+        <!-- W1 数据层：mybatis-plus-spring-boot3-starter 3.5.17 + mybatis-plus-jsqlparser(同版本) + mysql-connector-j + flyway-core -->
+        <!-- W3 鉴权：spring-boot-starter-security + jjwt 0.12.x -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 打出内嵌 Tomcat 的可执行 fat jar：java -jar 即可运行 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
