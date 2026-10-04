@@ -22,6 +22,13 @@
         <java.version>17</java.version>
         <!-- 版本号统一收敛在这里（工程手册第 8 章：依赖引入原则） -->
         <knife4j.version>4.5.0</knife4j.version>
+        <!-- MP 3.5.16：2026-01 发布，官方明确兼容 Boot 3.x；
+             没用最新的 3.5.17 —— 落后一个小版本换社区验证时间，架构师的保守是有意的 -->
+        <mybatis-plus.version>3.5.16</mybatis-plus.version>
+        <!-- jjwt 0.13.0：0.12 起 API 大改（verifyWith/parseSignedClaims），
+             网上 0.9.x 的教程代码抄过来会编译不过，看教程时先核对版本 -->
+        <jjwt.version>0.13.0</jjwt.version>
+        <hutool.version>5.8.46</hutool.version>
     </properties>
 
     <dependencies>
@@ -53,13 +60,82 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- ===== 按阶段引入（工程手册第 8 章），以下届时再加 ===== -->
-        <!-- W1 数据层：mybatis-plus-spring-boot3-starter 3.5.17 + mybatis-plus-jsqlparser(同版本) + mysql-connector-j + flyway-core -->
-        <!-- W3 鉴权：spring-boot-starter-security + jjwt 0.12.x -->
+        <!-- ===== W1 数据层 ===== -->
+        <!-- MyBatis-Plus：在 MyBatis 之上提供 CRUD 免写 SQL 的能力。
+             工程手册的裁定：简单 CRUD 用 MP，复杂查询仍然手写 XML SQL ——
+             只用 lambdaQuery() 会丢掉 SQL 能力，而面试恰恰考索引和 EXPLAIN -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+        <!-- 3.5.9 起分页插件被拆成独立模块（历史教训：官方拆包不另行通知，
+             升级后分页静默失效是 MP 用户最常见的坑之一），用分页必须显式引入 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+        <!-- MySQL 驱动（版本由 Boot BOM 托管，不用自己写版本号） -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- Flyway：数据库版本管理。表结构变更必须写成 V3__xxx.sql 迁移脚本，
+             不允许手工连库改表 —— 手工改的库无法在别人机器和线上复现（技能点：Migration） -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <!-- Flyway 10+ 把各数据库支持拆成独立模块，MySQL 必须加这个，否则启动报 "Unsupported Database: MySQL" -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+
+        <!-- ===== W3 鉴权 ===== -->
+        <!-- jjwt 三件套：api 写代码用，impl/jackson 运行时才需要（所以是 runtime scope） -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jjwt.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- Hutool 按需引入（不引 hutool-all）：只用 core 的工具方法和 crypto 的 BCrypt。
+             依赖越小，冲突面越小 ——「我用了 Hutool」不加分，说得出用哪块、为什么才加分 -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-core</artifactId>
+            <version>${hutool.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-crypto</artifactId>
+            <version>${hutool.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 测试专用：内存数据库，让 mvn test 不依赖本机 MySQL（CI 上也能跑）。
+             用 MySQL 兼容模式执行同一份 Flyway 迁移脚本，保证测的是同一套表结构 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

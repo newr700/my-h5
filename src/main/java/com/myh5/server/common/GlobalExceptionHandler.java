@@ -1,6 +1,7 @@
 package com.myh5.server.common;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -32,7 +33,17 @@ public class GlobalExceptionHandler {
         String message = fieldError == null
                 ? "参数校验失败"
                 : fieldError.getField() + " " + fieldError.getDefaultMessage();
-        return Result.fail(1001, message);
+        return Result.fail(ErrorCodes.PARAM_INVALID, message);
+    }
+
+    /**
+     * 请求体根本不是合法 JSON（或类型对不上，比如 matchId 传了字符串）。
+     * 不拦这个，客户端收到的是 5000「系统内部错误」—— 明明是调用方的锅，
+     * 却报警成我们的系统错误，监控会被污染。
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public Result<Void> handleNotReadable(HttpMessageNotReadableException e) {
+        return Result.fail(ErrorCodes.PARAM_INVALID, "请求体格式不正确");
     }
 
     /**
