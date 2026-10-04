@@ -30,6 +30,25 @@ const router = createRouter({
   ]
 })
 
+// ── 路由守卫：前端的第一道登录拦截 ─────────────────────────
+// 没登录却访问 requiresAuth 页面 → 送去 /login，并把「原本想去哪」
+// 存在 ?redirect= 里，登录成功后原路送回（见 LoginPage.vue 的 goBack）。
+//
+// 注意这只是【体验层】的拦截：守卫拦不住直接 curl 打后端接口的人 ——
+// 真正的防线在 Java 端 AuthInterceptor。前端的锁防君子，后端的锁防所有人，
+// 这又是「前端校验为体验，后端校验为安全」的一个实例。
+router.beforeEach((to) => {
+  const hasToken = !!localStorage.getItem('token')
+  if (to.meta.requiresAuth && !hasToken) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  // 已登录还访问登录页 → 没必要，直接回用户中心
+  if (to.path === '/login' && hasToken) {
+    return { path: '/user' }
+  }
+  return true
+})
+
 // 每次路由切换后同步浏览器标签页标题——小细节，但专业感就藏在这些地方
 router.afterEach((to) => {
   document.title = (to.meta.title as string) || 'my-h5-app'

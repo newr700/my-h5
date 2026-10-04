@@ -6,7 +6,16 @@ const routes: RouteRecordRaw[] = [
     path: '/user',
     name: 'UserHome',
     component: () => import('@/views/user/UserHome.vue'),
-    meta: { title: '用户中心' }
+    // requiresAuth：路由守卫（router/index.ts）凭这个标记决定要不要拦。
+    // 标记加在路由上而不是写死在守卫的名单里 —— 新页面自己声明「我要登录」，
+    // 守卫代码不用跟着改（开放封闭原则的一个小例子）
+    meta: { title: '用户中心', requiresAuth: true }
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/login/LoginPage.vue'),
+    meta: { title: '登录' }
   }
 ]
 

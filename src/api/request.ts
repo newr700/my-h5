@@ -61,6 +61,22 @@ request.interceptors.response.use(
     if (typeof shell.code !== 'number') {
       return Promise.reject(new Error(`[契约校验] 响应缺少数字类型的 code 字段，实际是 ${String(shell.code)}`))
     }
+
+    // 登录态失效的全局处理：清 token + 跳登录页。
+    // 1101=未登录/非法，1102=已过期（错误码表见 Java 端 common/ErrorCodes.java）
+    // 为什么放在请求层而不是各页面自己处理：任何接口都可能返回它，
+    // 每个页面写一遍 = 漏一个页面就白屏 —— 横切关注点收敛到拦截器，和 Java 端同一个思想
+    if (shell.code === 1101 || shell.code === 1102) {
+      localStorage.removeItem('token')
+      // 故意不用 vue-router 实例：request.ts 被 store 引用，router 又引用 store 的页面，
+      // 互相 import 会形成循环依赖（构建期玄学报错的温床）。
+      // hash 路由下直接改 location.hash 就能跳转，零依赖。（技能点：循环依赖的规避）
+      if (!location.hash.includes('/login')) {
+        location.hash = '#/login'
+      }
+      return Promise.reject(new Error(shell.message || '请重新登录'))
+    }
+
     if (shell.code !== 0) {
       // 业务错误在这里统一抛出，页面层 catch 即可
       return Promise.reject(new Error(shell.message || '请求失败'))
