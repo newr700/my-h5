@@ -60,11 +60,13 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // 开发时把 /api 代理到本地后端，后端起在 3000 端口
+      // 开发时把 /api 代理到本地后端 —— 2026-10-04 起后端主力换成 Java（my-h5-server，8080 端口）；
+      // Node 版（my-h5-api，3000 端口）冻结保留作对照。
+      // rewrite 把 /api 前缀去掉再转发：后端不配 context-path，前缀是代理层的职责（工程手册第 1 章裁定）。
       // （技能点：跨域与代理——浏览器同源策略只限“浏览器直连”，
       //  开发服务器是 Node 进程转发请求，不受同源策略约束；生产环境要换 CORS 或同域部署）
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       }
