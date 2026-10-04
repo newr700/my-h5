@@ -36,4 +36,18 @@ onMounted(() => {
   margin: 16px;
   width: calc(100% - 32px);
 }
+
+/* PC 断点：规则与积分榜页完全一致，见 StandingsList.vue 里的详细说明 */
+@media (min-width: 768px) {
+  /* 按钮在手机上占满一行是对的（拇指好点），
+     但在 900px 宽的内容区里拉成一条横幅就很怪 —— 用 max-width 收住并居中。
+     用 max-width 而不是 width：Vant 的 block 按钮自带 width: 100%，
+     直接改 width 会被组件库样式盖回去，max-width 才能稳定生效。 */
+  .reload-btn {
+    display: block;
+    margin: 24px auto;
+    max-width: 280px;
+    font-size: 15px;
+  }
+}
 </style>

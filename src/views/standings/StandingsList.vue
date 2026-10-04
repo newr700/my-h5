@@ -97,10 +97,24 @@ function rankBadgeClass(team: TeamStanding) {
         <h1 class="title">当前积分排名</h1>
         <p v-if="standingsStore.roundSummary" class="subtitle">{{ standingsStore.roundSummary }}</p>
       </div>
-      <div class="legend">
-        <span class="legend__item"><i class="dot dot--ucl" />欧冠区</span>
-        <span class="legend__item"><i class="dot dot--uel" />欧联区</span>
-        <span class="legend__item"><i class="dot dot--rel" />降级区</span>
+      <div class="titlebar__side">
+        <!-- PC 专用刷新按钮：下拉刷新是触摸手势，鼠标拖不动，PC 上必须给一个替代入口。
+             移动端用 CSS 把它藏起来（.pc-refresh 默认 display: none），
+             否则手机上会同时存在「下拉」和「按钮」两种刷新方式，用户不知道该用哪个。
+             ── 这就是「交互要跟着输入设备走」：手指能做的和鼠标能做的不是一回事。 -->
+        <button
+          class="pc-refresh"
+          type="button"
+          :disabled="standingsStore.refreshing"
+          @click="onRefresh"
+        >
+          {{ standingsStore.refreshing ? '刷新中…' : '刷新' }}
+        </button>
+        <div class="legend">
+          <span class="legend__item"><i class="dot dot--ucl" />欧冠区</span>
+          <span class="legend__item"><i class="dot dot--uel" />欧联区</span>
+          <span class="legend__item"><i class="dot dot--rel" />降级区</span>
+        </div>
       </div>
     </header>
 
@@ -185,13 +199,25 @@ function rankBadgeClass(team: TeamStanding) {
   background: #ffffff;
 }
 
-/* 标题栏：左标题右图例 */
+/* 标题栏：左标题，右侧是「刷新按钮（仅 PC）+ 图例」 */
 .titlebar {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   padding: 14px 12px 10px;
   border-bottom: 1px solid #ebedf0;
+}
+
+.titlebar__side {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* PC 刷新按钮：默认隐藏，只在 PC 断点下显示（见文件末尾 @media）。
+   注意这个类名带 pc- 前缀，是团队约定：看见它就说明「这段只在 PC 生效」。 */
+.pc-refresh {
+  display: none;
 }
 
 .title {
@@ -313,4 +339,114 @@ function rankBadgeClass(team: TeamStanding) {
 .zone--ucl { background: #ff976a; }
 .zone--uel { background: #1989fa; }
 .zone--rel { background: #ee0a24; }
+
+/* ══ PC / 平板断点（≥ 768px）════════════════════════════════════
+ *
+ * ── 为什么每个尺寸都得重写一遍 ──────────────────────────────
+ * 上面移动端样式里的 px 已被 postcss 转成 vw，在 1920 屏上会整体放大 5 倍
+ * （18px 的标题变成 92px）。而 vw 算的是**视口**宽度不是容器宽度，
+ * 所以「给容器加 max-width」根本挡不住它 —— 只能在这里用固定像素逐个覆盖。
+ * 这就是选 B 方案（响应式）必须付的代价：A 方案不用写这些，但也换不来宽屏布局。
+ *
+ * ── 为什么这里写 px 就是真实像素 ────────────────────────────
+ * vite.config.ts 里 mediaQuery: false，@media 花括号内的 px 不参与转换。
+ * 这条配置就是「移动端等比缩放」和「PC 重新排版」两套逻辑之间的隔离带。
+ *
+ * ── 技能点：响应式设计（面试高频）──────────────────────────
+ * 「移动端优先」：默认样式写手机，再用 min-width 向上覆盖。
+ * 为什么不用 max-width 向下覆盖？反过来写的话，手机端要下载并计算一堆
+ * 它永远用不上的 PC 规则 —— 手机流量和算力都更贵。
+ */
+@media (min-width: 768px) {
+  .titlebar {
+    padding: 20px 24px 16px;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+  }
+
+  .legend {
+    gap: 16px;
+    font-size: 13px;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  /* PC 刷新按钮现身。
+     cursor: pointer 是 PC 的基础礼仪 —— 鼠标用户靠指针形状判断「这能点」，
+     手机上压根没有指针，所以这条绝不能写在断点外面。 */
+  .pc-refresh {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border: 1px solid #dcdee0;
+    border-radius: 6px;
+    background: #ffffff;
+    font-size: 13px;
+    color: #323233;
+    cursor: pointer;
+  }
+
+  .pc-refresh:hover:not(:disabled) {
+    border-color: #1989fa;
+    color: #1989fa;
+  }
+
+  .pc-refresh:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .skeleton__row {
+    padding: 16px 24px;
+  }
+
+  .row {
+    padding: 12px 24px;
+    font-size: 15px;
+  }
+
+  /* hover 是 PC 独有的交互态：手指没有「悬停」这个概念。
+     放在断点外的后果是手机端点完一行，高亮残留在屏幕上不走。 */
+  .row:hover {
+    background: #f7f8fa;
+  }
+
+  /* 列宽同步放大：字号变大后，原来的 40px 排名列装不下队徽 */
+  .col--rank {
+    width: 56px;
+  }
+
+  .col--num {
+    width: 72px;
+  }
+
+  .col--wide {
+    width: 110px;
+  }
+
+  .badge {
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
+  }
+
+  .badge-img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .zone {
+    padding: 8px 24px;
+    font-size: 13px;
+  }
+}
 </style>

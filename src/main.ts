@@ -16,7 +16,13 @@ import Vant from 'vant'
 import 'vant/lib/index.css'
 import App from './App.vue'
 import router from './router'
+// 样式加载顺序是有意义的，别随手调换：
+//   1) vant 组件库样式（第三方，最先）
+//   2) index.css      本项目基础样式（reset + 主题变量），要能盖住组件库默认值
+//   3) responsive.css PC 端断点规则，要能盖住基础样式里的移动端设定
+// CSS 同级选择器「后加载者胜」，顺序错了覆盖就不生效，而且这种 bug 极难排查。
 import './assets/styles/index.css'
+import './assets/styles/responsive.css'
 
 const app = createApp(App)
 

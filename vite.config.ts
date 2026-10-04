@@ -30,6 +30,19 @@ export default defineConfig({
       // 不进入运行时、不污染业务代码，换掉它只需改这一段配置 —— 逃生成本极低。
       // 什么时候必须换：需要在平板/PC 上限制最大宽度时（纯 vw 会无限放大），
       // 换 postcss-mobile-forever（活跃维护，原生支持 maxWidth 与桌面居中）。
+      // ── 双模式适配的核心开关：mediaQuery: false ──────────────
+      // 它表示「@media 花括号里的 px 不参与转换」。这一条让两套逻辑共存：
+      //
+      //   默认样式（媒体查询外）→ px 自动转 vw → 移动端等比缩放，手机端零改动
+      //   @media (min-width: 768px) 里 → px 保持固定 → PC 端用真实像素接管布局
+      //
+      // 为什么必须这样：vw 是「等比缩放」思路，响应式是「换布局」思路，
+      // 两者方向相反。若不隔离，PC 上 18px 的标题会被放大成 92px（1920 屏）。
+      // 隔离之后，移动端继续享受自动适配，PC 端写固定像素重新排版，互不干扰。
+      //
+      // 逃生通道：任何不想被转成 vw 的选择器，加进 selectorBlackList。
+      //   .ignore-vw  —— 例外：某些必须保持物理像素的边框、阴影
+      //   .pc-fixed   —— PC 端专用类名，永远按写的 px 渲染（技能点：适配方案的可控性）
       pxToViewport({
           unitToConvert: 'px',
           viewportWidth: 375,
@@ -37,7 +50,7 @@ export default defineConfig({
           propList: ['*'],
           viewportUnit: 'vw',
           fontViewportUnit: 'vw',
-          selectorBlackList: ['.ignore-vw'],
+          selectorBlackList: ['.ignore-vw', '.pc-fixed'],
           minPixelValue: 1,
           mediaQuery: false,
           exclude: [/node_modules/]
