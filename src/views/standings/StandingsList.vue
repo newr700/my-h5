@@ -5,7 +5,7 @@
  *
  * ── 面试技能点（详见 docs/面试技能树.md T1/T2/T5）────────
  * 本文件：组合式 API / ref+computed / onMounted 生命周期 /
- *         v-if 与 v-for / :key 选择 / computed 缓存 / scoped CSS / Vant 组件
+ *         v-if 与 v-for / :key 选择 / computed 缓存 / scoped CSS / Element Plus 组件
  *
  * ── 为什么页面不许发请求 ────────────────────────────────
  * 页面是整个项目里更换最频繁的文件（改版、加功能都先动它）。
@@ -14,11 +14,12 @@
  *
  * ── 本页对应的清单条目（改这个页面时先读一遍）────────────
  * [前端-列表三态]     加载中骨架屏 / 失败全屏重试 / 空态防御
- * [前端-交互]         下拉刷新（移动端标配），刷新失败轻提示不打断浏览
+ * [前端-交互]         刷新按钮（PC/手机通用，鼠标点击即可）；移动端下拉刷新已移除，
+ *                    因为改用 Element Plus 桌面组件库，刷新入口统一为按钮
  * [前端-降级]         队徽有图显示图片，没图退化成排名圆圈
  */
 import { computed, onMounted } from 'vue'
-import { showFailToast, showSuccessToast } from 'vant'
+import { ElMessage } from 'element-plus'
 import { useStandingsStore } from '@/stores/standings'
 import type { TeamStanding } from '@/types/api'
 
@@ -54,17 +55,17 @@ function onRetry() {
   standingsStore.loadStandings().catch(() => {})
 }
 
-// 下拉刷新：失败时页面已经有数据了，只弹轻提示，绝不能把现有内容清掉。
+// 刷新：失败时页面已经有数据了，只弹轻提示，绝不能把现有内容清掉。
 // ── 为什么这里区分两种失败、上面首次失败却全屏报错？──────────────
 // 因为错误提示的“音量”要和用户损失匹配：
 // 首次失败用户两手空空 → 必须给重试入口（全屏错误）
-// 刷新失败用户还在看旧数据 → 小声说一句就行（toast），别打断人家
+// 刷新失败用户还在看旧数据 → 小声说一句就行（message），别打断人家
 async function onRefresh() {
   try {
     await standingsStore.loadStandings()
-    showSuccessToast('已更新')
+    ElMessage.success('已更新')
   } catch {
-    showFailToast('更新失败，请稍后再试')
+    ElMessage.error('更新失败，请稍后再试')
   }
 }
 
@@ -98,18 +99,17 @@ function rankBadgeClass(team: TeamStanding) {
         <p v-if="standingsStore.roundSummary" class="subtitle">{{ standingsStore.roundSummary }}</p>
       </div>
       <div class="titlebar__side">
-        <!-- PC 专用刷新按钮：下拉刷新是触摸手势，鼠标拖不动，PC 上必须给一个替代入口。
-             移动端用 CSS 把它藏起来（.pc-refresh 默认 display: none），
-             否则手机上会同时存在「下拉」和「按钮」两种刷新方式，用户不知道该用哪个。
-             ── 这就是「交互要跟着输入设备走」：手指能做的和鼠标能做的不是一回事。 -->
-        <button
-          class="pc-refresh"
-          type="button"
-          :disabled="standingsStore.refreshing"
+        <!-- 刷新按钮（PC/手机通用，鼠标点击即可）。
+             改用 Element Plus 后不再有「触摸下拉刷新」的专属手势，
+             统一用按钮刷新，简单且两端一致 -->
+        <el-button
+          class="refresh-btn"
+          :loading="standingsStore.refreshing"
+          :disabled="standingsStore.loading"
           @click="onRefresh"
         >
-          {{ standingsStore.refreshing ? '刷新中…' : '刷新' }}
-        </button>
+          刷新
+        </el-button>
         <div class="legend">
           <span class="legend__item"><i class="dot dot--ucl" />欧冠区</span>
           <span class="legend__item"><i class="dot dot--uel" />欧联区</span>
@@ -118,67 +118,57 @@ function rankBadgeClass(team: TeamStanding) {
       </div>
     </header>
 
-    <!-- 下拉刷新包在最外层：移动端用户刷新列表的肌肉记忆就是这个手势。
-         disabled 条件：首次加载时禁用——内容都没有，没有可“刷新”的东西 -->
-    <van-pull-refresh
-      v-model="standingsStore.refreshing"
-      :disabled="standingsStore.loading"
-      @refresh="onRefresh"
+    <!-- 状态一：首次加载中 → 骨架屏。
+         为什么用骨架屏不用转圈：它复刻了最终布局的形状，
+         用户心理上觉得“内容已经在路上”而不是“在等一个未知的结果” -->
+    <div v-if="isInitialLoading" class="skeleton">
+      <el-skeleton v-for="n in 8" :key="n" class="skeleton__row" :rows="1" animated />
+    </div>
+
+    <!-- 状态二：首次加载失败 → 全屏错误 + 重试按钮 -->
+    <el-result
+      v-else-if="isInitialError"
+      icon="error"
+      :title="standingsStore.error"
     >
-      <!-- 状态一：首次加载中 → 骨架屏。
-           为什么用骨架屏不用转圈：它复刻了最终布局的形状，
-           用户心理上觉得“内容已经在路上”而不是“在等一个未知的结果” -->
-      <div v-if="isInitialLoading" class="skeleton">
-        <van-skeleton
-          v-for="n in 8"
-          :key="n"
-          class="skeleton__row"
-          title
-          avatar
-          :row="1"
-          row-width="60%"
-        />
+      <template #extra>
+        <el-button type="primary" @click="onRetry">重新加载</el-button>
+      </template>
+    </el-result>
+
+    <!-- 状态三（防御）：成功但没数据 → 空态 -->
+    <el-empty v-else-if="isEmpty" description="赛季尚未开始，暂无积分数据" />
+
+    <!-- 状态四：正常数据 -->
+    <template v-else>
+      <!-- 草图要求：表头加粗 -->
+      <div class="row row--header">
+        <span class="col col--rank">排名</span>
+        <span class="col col--team">球队</span>
+        <span class="col col--num">轮次</span>
+        <span class="col col--num col--wide">胜/平/负</span>
+        <span class="col col--num">进失</span>
+        <span class="col col--num">积分</span>
       </div>
 
-      <!-- 状态二：首次加载失败 → 全屏错误 + 重试按钮 -->
-      <van-empty v-else-if="isInitialError" image="error" :description="standingsStore.error">
-        <van-button round type="primary" size="small" @click="onRetry">重新加载</van-button>
-      </van-empty>
-
-      <!-- 状态三（防御）：成功但没数据 → 空态 -->
-      <van-empty v-else-if="isEmpty" description="赛季尚未开始，暂无积分数据" />
-
-      <!-- 状态四：正常数据 -->
-      <template v-else>
-        <!-- 草图要求：表头加粗 -->
-        <div class="row row--header">
-          <span class="col col--rank">排名</span>
-          <span class="col col--team">球队</span>
-          <span class="col col--num">轮次</span>
-          <span class="col col--num col--wide">胜/平/负</span>
-          <span class="col col--num">进失</span>
-          <span class="col col--num">积分</span>
+      <template v-for="zone in zones" :key="zone.key">
+        <div class="zone" :class="`zone--${zone.key}`">{{ zone.title }}</div>
+        <!-- :key 用 rank：它是这条数据的天然唯一编号；
+             千万别用数组下标当 key——排序变化时 Vue 会复用错节点，页面闪烁串行 -->
+        <div v-for="team in zone.teams" :key="team.rank" class="row">
+          <span class="col col--rank">
+            <!-- 队徽降级：有图显示图，没图显示排名圆圈 -->
+            <img v-if="team.logoUrl" class="badge-img" :src="team.logoUrl" :alt="team.teamName" />
+            <i v-else :class="rankBadgeClass(team)">{{ team.rank }}</i>
+          </span>
+          <span class="col col--team">{{ team.teamName }}</span>
+          <span class="col col--num">{{ team.played }}</span>
+          <span class="col col--num col--wide">{{ team.win }}/{{ team.draw }}/{{ team.lose }}</span>
+          <span class="col col--num">{{ team.goalsFor }}/{{ team.goalsAgainst }}</span>
+          <span class="col col--num col--points">{{ team.points }}</span>
         </div>
-
-        <template v-for="zone in zones" :key="zone.key">
-          <div class="zone" :class="`zone--${zone.key}`">{{ zone.title }}</div>
-          <!-- :key 用 rank：它是这条数据的天然唯一编号；
-               千万别用数组下标当 key——排序变化时 Vue 会复用错节点，页面闪烁串行 -->
-          <div v-for="team in zone.teams" :key="team.rank" class="row">
-            <span class="col col--rank">
-              <!-- 队徽降级：有图显示图，没图显示排名圆圈 -->
-              <img v-if="team.logoUrl" class="badge-img" :src="team.logoUrl" :alt="team.teamName" />
-              <i v-else :class="rankBadgeClass(team)">{{ team.rank }}</i>
-            </span>
-            <span class="col col--team">{{ team.teamName }}</span>
-            <span class="col col--num">{{ team.played }}</span>
-            <span class="col col--num col--wide">{{ team.win }}/{{ team.draw }}/{{ team.lose }}</span>
-            <span class="col col--num">{{ team.goalsFor }}/{{ team.goalsAgainst }}</span>
-            <span class="col col--num col--points">{{ team.points }}</span>
-          </div>
-        </template>
       </template>
-    </van-pull-refresh>
+    </template>
   </div>
 </template>
 
@@ -189,35 +179,32 @@ function rankBadgeClass(team: TeamStanding) {
  * Vue 会给这个组件的所有元素打上随机属性（如 data-v-1a2b3c），
  * 这些选择器只命中带该属性的元素——两个人写同名 class 互相覆盖的惨案就此绝迹。
  *
- * ── 为什么敢直接写 px ─────────────────────────────────
- * 构建时 postcss-px-to-viewport 会把 px 自动换算成 vw：
- * 375px 设计稿上写 13px，在 750px 宽的安卓机上渲染出来还是占同样的比例。
- * 所以“按设计稿的像素值抄”就是这个项目的正确写法。 */
+ * ── 现在直接写 px 就是真实像素 ─────────────────────────
+ * 已移除 postcss-px-to-viewport，不再把 px 转 vw 等比缩放；
+ * 改用 Element Plus 桌面组件库后，页面按真实像素书写，PC 上即所见尺寸，
+ * 手机上偏小但可读（项目定位为 PC 为主、手机兼顾）。 */
 
 .page {
   min-height: 100vh;
   background: #ffffff;
+  padding: 0 16px;
 }
 
-/* 标题栏：左标题，右侧是「刷新按钮（仅 PC）+ 图例」 */
+/* 标题栏：左标题，右侧是「刷新按钮 + 图例」 */
 .titlebar {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  padding: 14px 12px 10px;
-  border-bottom: 1px solid #ebedf0;
+  padding: 14px 0 10px;
+  border-bottom: 1px solid #ebeef5;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .titlebar__side {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-/* PC 刷新按钮：默认隐藏，只在 PC 断点下显示（见文件末尾 @media）。
-   注意这个类名带 pc- 前缀，是团队约定：看见它就说明「这段只在 PC 生效」。 */
-.pc-refresh {
-  display: none;
 }
 
 .title {
@@ -229,7 +216,7 @@ function rankBadgeClass(team: TeamStanding) {
 .subtitle {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #969799;
+  color: #909399;
 }
 
 /* 分区图例：让人知道三种颜色各代表什么 */
@@ -237,7 +224,7 @@ function rankBadgeClass(team: TeamStanding) {
   display: flex;
   gap: 10px;
   font-size: 11px;
-  color: #646566;
+  color: #606266;
 }
 
 .legend__item {
@@ -252,27 +239,27 @@ function rankBadgeClass(team: TeamStanding) {
   border-radius: 50%;
 }
 
-.dot--ucl { background: #ff976a; }
-.dot--uel { background: #1989fa; }
-.dot--rel { background: #ee0a24; }
+.dot--ucl { background: #e6a23c; }
+.dot--uel { background: #409eff; }
+.dot--rel { background: #f56c6c; }
 
 /* 骨架屏行间距 */
 .skeleton__row {
-  padding: 12px;
-  border-bottom: 1px solid #f7f8fa;
+  padding: 12px 0;
+  border-bottom: 1px solid #f2f6fc;
 }
 
 .row {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid #f2f3f5;
+  padding: 10px 0;
+  border-bottom: 1px solid #f2f6fc;
   font-size: 13px;
 }
 
 .row--header {
   font-weight: bold;
-  background: #f7f8fa;
+  background: #f5f7fa;
 }
 
 /* 列宽：排名和球队占左边，四个数字列等宽对齐 */
@@ -316,9 +303,9 @@ function rankBadgeClass(team: TeamStanding) {
   color: #ffffff;
 }
 
-.badge--ucl { background: #ff976a; } /* 欧冠区：草图标注的橙色 */
-.badge--uel { background: #1989fa; }
-.badge--rel { background: #969799; }
+.badge--ucl { background: #e6a23c; } /* 欧冠区 */
+.badge--uel { background: #409eff; }
+.badge--rel { background: #909399; }
 
 /* 真队徽图片（后端补了 logoUrl 字段后自动生效） */
 .badge-img {
@@ -330,36 +317,33 @@ function rankBadgeClass(team: TeamStanding) {
 
 /* 分区标签条 */
 .zone {
-  padding: 6px 12px;
+  padding: 6px 0;
   font-size: 12px;
   font-weight: bold;
   color: #ffffff;
 }
 
-.zone--ucl { background: #ff976a; }
-.zone--uel { background: #1989fa; }
-.zone--rel { background: #ee0a24; }
+.zone--ucl { background: #e6a23c; }
+.zone--uel { background: #409eff; }
+.zone--rel { background: #f56c6c; }
 
 /* ══ PC / 平板断点（≥ 768px）════════════════════════════════════
- *
- * ── 为什么每个尺寸都得重写一遍 ──────────────────────────────
- * 上面移动端样式里的 px 已被 postcss 转成 vw，在 1920 屏上会整体放大 5 倍
- * （18px 的标题变成 92px）。而 vw 算的是**视口**宽度不是容器宽度，
- * 所以「给容器加 max-width」根本挡不住它 —— 只能在这里用固定像素逐个覆盖。
- * 这就是选 B 方案（响应式）必须付的代价：A 方案不用写这些，但也换不来宽屏布局。
- *
- * ── 为什么这里写 px 就是真实像素 ────────────────────────────
- * vite.config.ts 里 mediaQuery: false，@media 花括号内的 px 不参与转换。
- * 这条配置就是「移动端等比缩放」和「PC 重新排版」两套逻辑之间的隔离带。
  *
  * ── 技能点：响应式设计（面试高频）──────────────────────────
  * 「移动端优先」：默认样式写手机，再用 min-width 向上覆盖。
  * 为什么不用 max-width 向下覆盖？反过来写的话，手机端要下载并计算一堆
  * 它永远用不上的 PC 规则 —— 手机流量和算力都更贵。
+ *
+ * 现在既然不再有 vw 等比缩放，这套覆盖就是「把手机尺寸放大到桌面舒适值」，
+ * 而不是「救场防止 5 倍放大」。
  */
 @media (min-width: 768px) {
+  .page {
+    padding: 0 24px;
+  }
+
   .titlebar {
-    padding: 20px 24px 16px;
+    padding: 20px 0 16px;
   }
 
   .title {
@@ -380,44 +364,10 @@ function rankBadgeClass(team: TeamStanding) {
     height: 10px;
   }
 
-  /* PC 刷新按钮现身。
-     cursor: pointer 是 PC 的基础礼仪 —— 鼠标用户靠指针形状判断「这能点」，
-     手机上压根没有指针，所以这条绝不能写在断点外面。 */
-  .pc-refresh {
-    display: inline-flex;
-    align-items: center;
-    padding: 6px 14px;
-    border: 1px solid #dcdee0;
-    border-radius: 6px;
-    background: #ffffff;
-    font-size: 13px;
-    color: #323233;
-    cursor: pointer;
-  }
-
-  .pc-refresh:hover:not(:disabled) {
-    border-color: #1989fa;
-    color: #1989fa;
-  }
-
-  .pc-refresh:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .skeleton__row {
-    padding: 16px 24px;
-  }
-
-  .row {
-    padding: 12px 24px;
-    font-size: 15px;
-  }
-
   /* hover 是 PC 独有的交互态：手指没有「悬停」这个概念。
      放在断点外的后果是手机端点完一行，高亮残留在屏幕上不走。 */
   .row:hover {
-    background: #f7f8fa;
+    background: #f5f7fa;
   }
 
   /* 列宽同步放大：字号变大后，原来的 40px 排名列装不下队徽 */
@@ -445,8 +395,12 @@ function rankBadgeClass(team: TeamStanding) {
   }
 
   .zone {
-    padding: 8px 24px;
+    padding: 8px 0;
     font-size: 13px;
+  }
+
+  .row {
+    font-size: 15px;
   }
 }
 </style>

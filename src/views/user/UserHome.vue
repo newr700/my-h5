@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
 /**
@@ -16,61 +17,90 @@ onMounted(() => {
   userStore.loadProfile().catch(() => {})
 })
 
+// 头像占位文字：昵称/用户名首字符（后端补 avatar 字段后可换图）
+const avatarText = computed(() => {
+  const name = userStore.profile?.nickname || userStore.profile?.username || '?'
+  return name.charAt(0).toUpperCase()
+})
+
 function onLogout() {
-  userStore.logout()
-  // 登出后回登录页（hash 路由；replace 不留历史，按返回键不会回到要登录的页面）
-  router.replace('/login')
+  // 退出登录用二次确认：这是不可逆操作（清掉本地登录态），误触成本高，
+  // 用 ElMessageBox.confirm 拦一道，比直接登出更稳妥（技能点：危险操作二次确认）
+  ElMessageBox.confirm('确定要退出登录吗？', '提示', { type: 'warning' })
+    .then(() => {
+      userStore.logout()
+      // 登出后回登录页（replace 不留历史，按返回键不会回到要登录的页面）
+      router.replace('/login')
+    })
+    .catch(() => {
+      // 用户点「取消」也会进 catch，这是 ElMessageBox 取消的正常路径，不是错误
+    })
 }
 </script>
 
 <template>
   <div class="page">
-    <van-nav-bar title="用户中心" />
+    <!-- 资料加载成功：卡片 + 描述列表 + 操作 -->
+    <el-card v-if="userStore.profile" class="profile-card">
+      <template #header>
+        <div class="card-header">
+          <el-avatar :size="44">{{ avatarText }}</el-avatar>
+          <span class="header-title">用户中心</span>
+        </div>
+      </template>
 
-    <template v-if="userStore.profile">
-      <van-cell-group inset>
-        <van-cell title="昵称" :value="userStore.profile.nickname" />
-        <van-cell title="用户名" :value="userStore.profile.username" />
-        <van-cell title="ID" :value="String(userStore.profile.id)" />
-        <van-cell title="注册时间" :value="userStore.profile.createdAt" />
-      </van-cell-group>
+      <el-descriptions :column="1" border>
+        <el-descriptions-item label="昵称">{{ userStore.profile.nickname }}</el-descriptions-item>
+        <el-descriptions-item label="用户名">{{ userStore.profile.username }}</el-descriptions-item>
+        <el-descriptions-item label="ID">{{ userStore.profile.id }}</el-descriptions-item>
+        <el-descriptions-item label="注册时间">{{ userStore.profile.createdAt }}</el-descriptions-item>
+      </el-descriptions>
 
-      <div class="action-area">
-        <van-button type="primary" block round @click="router.push('/order')">
-          去看看我的订单
-        </van-button>
-        <van-button block round class="logout-btn" @click="onLogout">
-          退出登录
-        </van-button>
+      <div class="actions">
+        <el-button type="primary" @click="router.push('/order')">去看看我的订单</el-button>
+        <el-button @click="onLogout">退出登录</el-button>
       </div>
-    </template>
+    </el-card>
 
-    <van-empty v-else-if="userStore.loading" description="加载中…" />
-    <van-empty v-else description="资料加载失败">
-      <van-button type="primary" round @click="userStore.loadProfile">重试</van-button>
-    </van-empty>
+    <!-- 加载中：骨架屏 -->
+    <el-card v-else-if="userStore.loading" class="state-card">
+      <el-skeleton :rows="4" animated />
+    </el-card>
+
+    <!-- 加载失败：错误态 + 重试入口（清单：错误必须可感知） -->
+    <el-card v-else class="state-card">
+      <el-result icon="error" title="资料加载失败">
+        <template #extra>
+          <el-button type="primary" @click="userStore.loadProfile">重试</el-button>
+        </template>
+      </el-result>
+    </el-card>
   </div>
 </template>
 
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #f7f8fa;
+  background: #f5f7fa;
+  padding: 16px;
 }
-.action-area {
-  margin: 16px;
+.profile-card,
+.state-card {
+  max-width: 600px;
+  margin: 0 auto;
+}
+.card-header {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 12px;
 }
-.logout-btn {
-  color: #ee0a24;
+.header-title {
+  font-size: 16px;
+  font-weight: 600;
 }
-
-@media (min-width: 768px) {
-  .action-area {
-    max-width: 320px;
-    margin: 24px auto;
-  }
+.actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
 }
 </style>

@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import userRoutes from './modules/user'
 import orderRoutes from './modules/order'
 import standingsRoutes from './modules/standings'
@@ -11,17 +11,18 @@ import standingsRoutes from './modules/standings'
  * 天天冲突。拆开后各管各的，这个文件基本不再变动。
  * 新增模块三步：modules/ 下建文件 → 这里 import → 数组里展开。
  *
- * ── 为什么用 hash 模式（地址里带 #）────────────────────
- * 部署时只需要一个静态文件服务器，不需要任何“路径重写”配置；
- * 代价是 URL 不够优雅（/#/standings）。
- * 若将来要改成 history 模式获得干净 URL，
- * 服务器必须补一条“所有路径都返回 index.html”的重写规则，别忘了。
+ * ── 为什么用 history 模式（地址干净，无 #）──────────────
+ * 与 hash 模式对比：hash 靠 location.hash 不发请求，静态服务器零配置即可；
+ * history 靠 pushState，URL 更优雅（/standings 而非 /#/standings），
+ * 但代价是【部署必须配置 SPA fallback】：任意子路径刷新或直链都要返回 index.html，
+ * 否则 404。本项目已在根目录 vercel.json 配了 rewrites 兜底（Vercel 平台）。
+ * 若换 Nginx，加一句 `try_files $uri $uri/ /index.html;` 同理。
  *
- * （技能点：vue-router 双模式原理——hash 靠 location.hash 不发请求，
- *  history 靠 pushState 需要 server 配合；面试高频对比题）
+ * （技能点：vue-router 双模式原理——hash 不发请求 vs history 需 server 配合；
+ *  面试高频对比题，重点讲清“history 模式上线为什么要多配一步”）
  */
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/user' },
     ...userRoutes,

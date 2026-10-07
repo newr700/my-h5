@@ -15,7 +15,8 @@ const routes: RouteRecordRaw[] = [
     path: '/login',
     name: 'Login',
     component: () => import('@/views/login/LoginPage.vue'),
-    meta: { title: '登录' }
+    // nav: false —— 登录页做全屏页，App.vue 据此不渲染顶部导航栏
+    meta: { title: '登录', nav: false }
   }
 ]
 

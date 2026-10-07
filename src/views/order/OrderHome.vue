@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { showToast } from 'vant'
+import { ElMessage } from 'element-plus'
 import { useOrderStore } from '@/stores/order'
 import { formatPrice } from '@/utils/format'
 
@@ -12,7 +12,7 @@ import { formatPrice } from '@/utils/format'
  *   下半区「我的订单」：列表 → 支付/取消（推状态机）
  *
  * 与积分榜页相同的三态处理（骨架/错误/空态）这里从简成两态，
- * 因为本页守卫保证已登录，且操作反馈用 toast 即时给出 ——
+ * 因为本页守卫保证已登录，且操作反馈用 ElMessage 即时给出 ——
  * 三态不是教条，按页面性质取舍。
  */
 const orderStore = useOrderStore()
@@ -49,161 +49,176 @@ const previewTotal = computed(() =>
 
 async function onSubmit() {
   if (selectedMatchId.value === null) {
-    showToast('请先选择比赛')
+    ElMessage.warning('请先选择比赛')
     return
   }
   try {
     await orderStore.submitOrder(selectedMatchId.value, quantity.value)
-    showToast('下单成功')
+    ElMessage.success('下单成功')
   } catch (e) {
-    showToast(e instanceof Error ? e.message : '下单失败')
+    ElMessage.error(e instanceof Error ? e.message : '下单失败')
   }
 }
 
 async function onPay(id: number) {
   try {
     await orderStore.pay(id)
-    showToast('支付成功')
+    ElMessage.success('支付成功')
   } catch (e) {
     // 后端状态机守卫会拒绝非法操作（如对 paid 订单再支付），错误话术来自后端
-    showToast(e instanceof Error ? e.message : '支付失败')
+    ElMessage.error(e instanceof Error ? e.message : '支付失败')
   }
 }
 
 async function onCancel(id: number) {
   try {
     await orderStore.cancel(id)
-    showToast('已取消')
+    ElMessage.success('已取消')
   } catch (e) {
-    showToast(e instanceof Error ? e.message : '取消失败')
+    ElMessage.error(e instanceof Error ? e.message : '取消失败')
   }
 }
 
-/** 状态 → 展示文案与颜色（状态机的可视化） */
-const STATUS_META: Record<string, { text: string; color: string }> = {
-  pending: { text: '待支付', color: '#ff976a' },
-  paid: { text: '已支付', color: '#07c160' },
-  closed: { text: '已关闭', color: '#c8c9cc' }
+/** 状态 → 标签类型（状态机的可视化）。
+ *  el-tag 的 type 是预设语义色：warning 待支付 / success 已支付 / info 已关闭 */
+const STATUS_TAG_TYPE: Record<string, 'warning' | 'success' | 'info'> = {
+  pending: 'warning',
+  paid: 'success',
+  closed: 'info'
+}
+const STATUS_TEXT: Record<string, string> = {
+  pending: '待支付',
+  paid: '已支付',
+  closed: '已关闭'
 }
 </script>
 
 <template>
   <div class="page">
-    <van-nav-bar title="订单" />
-
     <!-- 错误态：整页加载失败时给重试入口（清单：错误必须可感知） -->
-    <van-empty v-if="error" :description="error">
-      <van-button type="primary" round @click="() => { error = ''; orderStore.loadMatches(); orderStore.loadOrders() }">
-        重试
-      </van-button>
-    </van-empty>
+    <el-alert
+      v-if="error"
+      type="error"
+      :title="error"
+      show-icon
+      class="error-alert"
+      @close="error = ''"
+    >
+      <template #default>
+        <el-button size="small" type="danger" @click="error = ''; orderStore.loadMatches(); orderStore.loadOrders()">
+          重试
+        </el-button>
+      </template>
+    </el-alert>
 
-    <template v-else>
-      <!-- ── 买票区 ─────────────────────────────────────── -->
-      <van-cell-group inset title="买票">
-        <van-cell
+    <!-- ── 买票区 ─────────────────────────────────────── -->
+    <el-card class="block" header="买票">
+      <el-radio-group v-model="selectedMatchId" class="match-group">
+        <!-- Element Plus 的 el-radio 用 :value 绑定值（旧版用 label，已弃用） -->
+        <el-radio
           v-for="match in orderStore.matches"
           :key="match.id"
-          :title="match.matchTitle"
-          :label="`${match.matchTime} ｜ ¥${formatPrice(match.unitPrice)}/张`"
-          @click="selectedMatchId = match.id"
+          :value="match.id"
+          border
+          class="match-radio"
         >
-          <template #right-icon>
-            <van-radio :model-value="selectedMatchId === match.id" />
-          </template>
-        </van-cell>
+          {{ match.matchTitle }} ｜ {{ match.matchTime }} ｜ ¥{{ formatPrice(match.unitPrice) }}/张
+        </el-radio>
+      </el-radio-group>
 
-        <van-cell title="数量">
-          <template #value>
-            <!-- 步进器上限 10 与后端 DTO 的 @Max(10) 一致 —— 双校验的可见例子 -->
-            <van-stepper v-model="quantity" min="1" max="10" />
-          </template>
-        </van-cell>
+      <el-form :inline="true" class="buy-form">
+        <el-form-item label="数量">
+          <!-- 步进器上限 10 与后端 DTO 的 @Max(10) 一致 —— 双校验的可见例子 -->
+          <el-input-number v-model="quantity" :min="1" :max="10" />
+        </el-form-item>
+        <el-form-item label="预计总价">
+          <span class="price">¥{{ formatPrice(previewTotal) }}</span>
+        </el-form-item>
+      </el-form>
 
-        <van-cell title="预计总价">
-          <template #value>
-            <span class="price">¥{{ formatPrice(previewTotal) }}</span>
-          </template>
-        </van-cell>
-      </van-cell-group>
+      <el-button
+        type="primary"
+        :loading="orderStore.submitting"
+        :disabled="selectedMatchId === null"
+        @click="onSubmit"
+      >
+        提交订单
+      </el-button>
+    </el-card>
 
-      <div class="submit-area">
-        <van-button
-          type="primary"
-          block
-          round
-          :loading="orderStore.submitting"
-          :disabled="selectedMatchId === null"
-          @click="onSubmit"
-        >
-          提交订单
-        </van-button>
-      </div>
-
-      <!-- ── 我的订单 ────────────────────────────────────── -->
-      <van-cell-group inset title="我的订单">
-        <van-empty v-if="!orderStore.orders.length && !orderStore.loading" description="还没有订单" />
-        <van-cell
-          v-for="order in orderStore.orders"
-          :key="order.id"
-          :title="order.matchTitle"
-          :label="`${order.orderNo} ｜ ${order.quantity} 张 × ¥${formatPrice(order.unitPrice)}`"
-        >
-          <template #value>
-            <div class="order-right">
-              <span class="price">¥{{ formatPrice(order.totalAmount) }}</span>
-              <van-tag :color="STATUS_META[order.status]?.color" plain>
-                {{ STATUS_META[order.status]?.text ?? order.status }}
-              </van-tag>
-              <!-- 只有 pending 才显示操作按钮 —— 前端按状态机隐藏入口，
-                   后端状态机守卫兜底（curl 绕过按钮直接调接口也会被 3002 拒） -->
-              <div v-if="order.status === 'pending'" class="order-actions">
-                <van-button size="small" type="primary" @click="onPay(order.id)">支付</van-button>
-                <van-button size="small" @click="onCancel(order.id)">取消</van-button>
-              </div>
-            </div>
+    <!-- ── 我的订单 ────────────────────────────────────── -->
+    <el-card class="block" header="我的订单">
+      <el-empty v-if="!orderStore.orders.length && !orderStore.loading" description="还没有订单" />
+      <el-table v-else :data="orderStore.orders" stripe>
+        <el-table-column prop="matchTitle" label="比赛" min-width="160" />
+        <el-table-column prop="orderNo" label="订单号" min-width="180" />
+        <el-table-column prop="quantity" label="数量" width="70" />
+        <el-table-column label="单价" width="110">
+          <template #default="{ row }">¥{{ formatPrice(row.unitPrice) }}</template>
+        </el-table-column>
+        <el-table-column label="总价" width="110">
+          <template #default="{ row }">
+            <span class="price">¥{{ formatPrice(row.totalAmount) }}</span>
           </template>
-        </van-cell>
-      </van-cell-group>
-    </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="STATUS_TAG_TYPE[row.status] ?? 'info'" effect="light">
+              {{ STATUS_TEXT[row.status] ?? row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="140">
+          <template #default="{ row }">
+            <!-- 只有 pending 才显示操作按钮 —— 前端按状态机隐藏入口，
+                 后端状态机守卫兜底（curl 绕过按钮直接调接口也会被 3002 拒） -->
+            <template v-if="row.status === 'pending'">
+              <el-button size="small" type="primary" @click="onPay(row.id)">支付</el-button>
+              <el-button size="small" @click="onCancel(row.id)">取消</el-button>
+            </template>
+            <span v-else class="no-action">—</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #f7f8fa;
-  padding-bottom: 24px;
+  background: #f5f7fa;
+  padding: 16px;
 }
-.price {
-  color: #ee0a24;
-  font-weight: 600;
+.block {
+  max-width: 960px;
+  margin: 0 auto 16px;
 }
-.submit-area {
-  margin: 16px;
+.error-alert {
+  max-width: 960px;
+  margin: 0 auto 16px;
 }
-.order-right {
+/* el-radio 竖向排列更清晰：每个选项独占一行，比赛信息较长也不挤 */
+.match-group {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+  align-items: stretch;
+  gap: 10px;
 }
-.order-actions {
-  display: flex;
-  gap: 8px;
+.match-radio {
+  width: 100%;
+  margin-right: 0;
+  height: auto;
+  white-space: normal;
 }
-
-/* PC 断点：规则与积分榜页一致 */
-@media (min-width: 768px) {
-  .submit-area {
-    max-width: 320px;
-    margin: 24px auto;
-  }
-  .order-actions {
-    flex-direction: row;
-  }
-  .page :deep(.van-cell:hover) {
-    background: #fafafa;
-  }
+.buy-form {
+  margin-top: 16px;
+}
+.price {
+  color: #f56c6c;
+  font-weight: 600;
+}
+.no-action {
+  color: #c0c4cc;
 }
 </style>
