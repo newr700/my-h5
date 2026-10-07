@@ -1,6 +1,5 @@
 package com.myh5.server.match;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.myh5.server.common.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,26 +10,28 @@ import java.util.List;
 
 /**
  * 比赛接口（PRD-F4）。公开端点 —— 看球票不需要登录，买才需要。
+ *
+ * 这是 Controller 该有的样子（参照 StandingsController 范本）：
+ *   ① 只接 HTTP 参数（本端点无参）；
+ *   ② 把活交给 MatchService；
+ *   ③ 用 Result 包好返回。
+ * 不写任何业务逻辑、不碰 Mapper —— 数据库读写归 Service，这是《工程实施手册》3.2 的分层红线。
  */
 @Tag(name = "比赛")
 @RestController
 public class MatchController {
 
-    private final MatchInfoMapper matchInfoMapper;
+    private final MatchService matchService;
 
-    public MatchController(MatchInfoMapper matchInfoMapper) {
-        this.matchInfoMapper = matchInfoMapper;
+    /** 构造器注入 Service（注意：注入的是 Service，不是 Mapper） */
+    public MatchController(MatchService matchService) {
+        this.matchService = matchService;
     }
 
     @Operation(summary = "获取在售比赛列表", description = "按开赛时间升序，只返回在售场次")
     @GetMapping("/matches")
     public Result<List<MatchVo>> listOnSale() {
-        List<MatchInfoEntity> entities = matchInfoMapper.selectList(
-                new LambdaQueryWrapper<MatchInfoEntity>()
-                        .eq(MatchInfoEntity::getStatus, "on_sale")
-                        .orderByAsc(MatchInfoEntity::getMatchTime)
-        );
-        // 这里没有写 XML：单表 + 简单条件，正是 MP 该干的活（复杂查询才手写 XML，见 OrderMapper.xml）
-        return Result.ok(entities.stream().map(MatchVo::from).toList());
+        // 三层职责拆干净：接参（无）→ 调 Service（业务在 Service 里）→ 包 Result
+        return Result.ok(matchService.listOnSale());
     }
 }

@@ -15,5 +15,5 @@ import org.apache.ibatis.annotations.Mapper;
  *  「接口没有 implements 为什么能注入调用」是经典面试题）
  */
 @Mapper
-public interface UserMapper extends BaseMapper<UserEntity> {
+public interface UserMapper extends BaseMapper<UserEntity> {//BaseMapper：MP框架的持久层接口
 }
