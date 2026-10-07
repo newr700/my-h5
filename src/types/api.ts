@@ -45,6 +45,27 @@ export interface MatchInfo {
   matchTime: string
   /** 单价（分）—— 金额全程整数，展示时才除以 100（见 utils/format.ts） */
   unitPrice: number
+
+  // ── V2 第一步：库存快照（对应 Java MatchVo 的 totalStock / stock）────────
+
+  /** 总票数 —— 用于展示「共 N 张」，也是剩余票数的参照上限 */
+  totalStock: number
+
+  /**
+   * 剩余票数 —— ⚠️ 这是【某一瞬间的快照】，不是承诺。
+   *
+   * 列表返回的余票，在「我们看到数字」到「用户点击提交」之间可能已经变了：
+   * 网络传输要几百毫秒，够别人把最后几张买走了。
+   *
+   * 所以它的正确用法只有两个：
+   *   ✅ 控制 UI —— 显示「余 N 张」、售罄时把选项置灰禁点；
+   *   ❌ 不能做业务判断 —— 不能因为「显示还剩 3 张」就认为一定买得到。
+   *
+   * 真正的把关在后端：下单那一刻会走一条带条件的原子 UPDATE
+   * （详见后端 MatchInfoMapper.deductStock 的注释），不够就返回错误码 3003。
+   * 这条边界就是工程手册里那句「前端负责展示，后端负责正确」。
+   */
+  stock: number
 }
 
 /** 订单条目（对应 order/OrderVo.java） */

@@ -38,6 +38,28 @@ const selectedMatch = computed(() =>
   orderStore.matches.find((m) => m.id === selectedMatchId.value) ?? null
 )
 
+// ── V2 第一步：库存相关的 UI 状态 ──────────────────────────────
+
+/**
+ * 可买数量上限 = min(后端单笔上限 10, 当前剩余库存)。
+ *
+ * 【这是一个体验优化，不是安全措施】—— 这点务必分清：
+ * 用户在步进器里选不出超过库存的数量，确实少撞几次后端 3003，
+ * 但这个限制【可以被绕过】：改请求体直接发 quantity=10 的程序，
+ * 或者票在这几百毫秒里被别人买走，前端的限制都拦不住。
+ * 真正拦得住的只有后端那条原子 UPDATE。
+ *
+ * 把「前端限制」当安全手段，是典型的层次错位 ——
+ * 前端的所有验证，价值都在于【让用户少走弯路】，不在于防攻击。
+ */
+const maxBuyable = computed(() => {
+  if (!selectedMatch.value) return 1
+  return Math.max(1, Math.min(10, selectedMatch.value.stock))
+})
+
+/** 是否已售罄（余票为 0）—— 用于给按钮和选项加视觉反馈 */
+const soldOut = computed(() => selectedMatch.value !== null && selectedMatch.value.stock <= 0)
+
 /**
  * 预计总价 —— 注意这只是「预览」，不是成交价。
  * 真正入账的金额由后端拿 matchId 查库重算（PRD 5.2），
@@ -52,11 +74,22 @@ async function onSubmit() {
     ElMessage.warning('请先选择比赛')
     return
   }
+  if (soldOut.value) {
+    ElMessage.warning('该场比赛已售罄')
+    return
+  }
   try {
     await orderStore.submitOrder(selectedMatchId.value, quantity.value)
     ElMessage.success('下单成功')
+    // 【V2】下完单必须重新拉一次比赛列表刷新余票。
+    // 不刷新的话页面上还是下单前的旧数字，用户接着买第二单就会撞上 3003 莫名其妙。
+    // 这是「状态一致性」的前端版本：数据变了就重新取，不要在本地推算。
+    await orderStore.loadMatches()
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : '下单失败')
+    // 失败也要刷新 —— 尤其是 3003 库存不足，原因通常就是「票被别人买走了」，
+    // 不刷新的话用户会盯着过期的数字反复撞同一个错
+    await orderStore.loadMatches()
   }
 }
 
@@ -119,17 +152,24 @@ const STATUS_TEXT: Record<string, string> = {
           v-for="match in orderStore.matches"
           :key="match.id"
           :value="match.id"
+          :disabled="match.stock <= 0"
           border
           class="match-radio"
         >
           {{ match.matchTitle }} ｜ {{ match.matchTime }} ｜ ¥{{ formatPrice(match.unitPrice) }}/张
+          <!-- 余票提示：紧张时（≤5）转橙色，售罄转红色 -->
+          <span v-if="match.stock > 0" class="stock" :class="{ warn: match.stock <= 5 }">
+            ｜余 {{ match.stock }} 张
+          </span>
+          <span v-else class="stock sold-out">｜已售罄</span>
         </el-radio>
       </el-radio-group>
 
       <el-form :inline="true" class="buy-form">
         <el-form-item label="数量">
-          <!-- 步进器上限 10 与后端 DTO 的 @Max(10) 一致 —— 双校验的可见例子 -->
-          <el-input-number v-model="quantity" :min="1" :max="10" />
+          <!-- 步进器上限跟随剩余库存：后端 @Max(10) 是硬限制，
+               这里再按余票收窄一层，纯为体验（真正的把关在后端原子扣减） -->
+          <el-input-number v-model="quantity" :min="1" :max="maxBuyable" />
         </el-form-item>
         <el-form-item label="预计总价">
           <span class="price">¥{{ formatPrice(previewTotal) }}</span>
@@ -139,10 +179,10 @@ const STATUS_TEXT: Record<string, string> = {
       <el-button
         type="primary"
         :loading="orderStore.submitting"
-        :disabled="selectedMatchId === null"
+        :disabled="selectedMatchId === null || soldOut"
         @click="onSubmit"
       >
-        提交订单
+        {{ soldOut ? '已售罄' : '提交订单' }}
       </el-button>
     </el-card>
 
@@ -217,6 +257,18 @@ const STATUS_TEXT: Record<string, string> = {
 .price {
   color: #f56c6c;
   font-weight: 600;
+}
+/* V2：余票标签 —— 正常灰 / 紧张橙 / 售罄红 */
+.stock {
+  color: #909399;
+  font-size: 12px;
+}
+.stock.warn {
+  color: #e6a23c;
+  font-weight: 500;
+}
+.stock.sold-out {
+  color: #f56c6c;
 }
 .no-action {
   color: #c0c4cc;

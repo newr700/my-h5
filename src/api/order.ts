@@ -24,7 +24,12 @@ function parseMatch(raw: unknown, index: number): MatchInfo {
     matchTitle: asString(raw.matchTitle, at('matchTitle')),
     matchTime: asString(raw.matchTime, at('matchTime')),
     // 金额是核心数据：严格模式，错了宁可页面报错也不能让用户下错单
-    unitPrice: asNumber(raw.unitPrice, at('unitPrice'))
+    unitPrice: asNumber(raw.unitPrice, at('unitPrice')),
+    // V2：库存字段同样用严格模式 —— 票数是「能不能买」的依据，
+    // 若因为字段缺失被 quietly 当成 undefined，前端算出来的「剩余」会是 NaN，
+    // 按钮状态全乱。宁可在这里炸清楚，也不要带着脏数据往后走
+    totalStock: asNumber(raw.totalStock, at('totalStock')),
+    stock: asNumber(raw.stock, at('stock'))
   }
 }
 
