@@ -36,6 +36,13 @@ public final class ErrorCodes {
     public static final int ORDER_NOT_FOUND = 3001;
     /** 订单当前状态不允许该操作（状态机守卫，见 OrderService） */
     public static final int ORDER_STATE_INVALID = 3002;
+    /**
+     * V2：库存不足（票卖完了，或剩余票数不够这次买的数量）。
+     *
+     * 【为什么不复用 1002 NOT_FOUND】让用户看到明确原因（"票不够了"）比
+     * 「资源不存在」体验好得多；而且前端可以据此刷新列表显示真实余票。
+     */
+    public static final int STOCK_NOT_ENOUGH = 3003;
 
     /** 系统内部错误（未捕获异常兜底，细节只进日志，绝不透出堆栈） */
     public static final int SYSTEM_ERROR = 5000;

@@ -45,7 +45,13 @@ public class OrderService {
 
     /**
      * 创建订单（PRD 5.2 写操作闭环的核心）。
-     * 流程：查比赛 → 后端算钱 → 生成订单号 → 落库。
+     * 流程：查比赛 → 【V2 扣库存】→ 后端算钱 → 生成订单号 → 落库。
+     *
+     * @Transactional 在这里的意义（V2 后变得更关键了）：
+     * 现在这个方法里既有「UPDATE 库存」又有「INSERT 订单」，是两个独立的写操作。
+     * 没有事务时它们各自单独提交，一旦中间出错就会出现
+     * 「库存扣了但订单没建成」（用户没买到，票还少了）这种冤案。
+     * 有了事务，抛异常会让两步【一起回滚】—— 要么都成，要么都不成。
      */
     @Transactional
     public OrderVo create(CreateOrderRequest req) {
@@ -54,6 +60,27 @@ public class OrderService {
         MatchInfoEntity match = matchInfoMapper.selectById(req.matchId());
         if (match == null || !"on_sale".equals(match.getStatus())) {
             throw new BizException(ErrorCodes.NOT_FOUND, "比赛不存在或已下架");
+        }
+
+        // ── V2：先把票占下来 ──────────────────────────────
+        // 【为什么放在创建订单【之前】】
+        // 下单的本质是「抢稀缺资源」，先到先得。若先建订单再扣库存，
+        // 就会出现「订单插进去了才发现没票，再回滚」—— 白白写了一次数据，
+        // 高并发时这些无效写入会把数据库连接池和磁盘 IO 吃掉。
+        // 先扣还是后扣在功能上等价，但在争抢场景下「先占资源」更符合直觉也更省。
+        //
+        // 【返回 0 意味着什么】看一下 MatchInfoMapper.deductStock 的注释：
+        // 那条 UPDATE 带了 WHERE stock >= qty 的条件，由数据库在加锁的瞬间判断。
+        // 返回 0 = 条件没满足 = 票不够了。这是【并发安全】的判断，
+        // 与上面那个简单的 if (match == null) 完全不同 ——
+        // 后者只是把明显不合法的请求挡在外面，真正防超卖的是这一条。
+        int affected = matchInfoMapper.deductStock(match.getId(), req.quantity());
+        if (affected == 0) {
+            // 抛异常 → @Transactional 回滚 → 本次没扣到票也不会留下任何半成品记录。
+            // 错误话术要明确：用户点提交时看到的是「前台还有 3 张」这一秒的旧快照，
+            // 告诉他发生了什么比含糊的「下单失败」体验好得多
+            throw new BizException(ErrorCodes.STOCK_NOT_ENOUGH,
+                    "票不够了（可能刚被别人买走），请刷新后重试");
         }
 
         OrderEntity order = new OrderEntity();
@@ -127,9 +154,19 @@ public class OrderService {
             throw new BizException(ErrorCodes.ORDER_STATE_INVALID,
                     "订单当前状态不允许取消（状态：" + order.getStatus() + "）");
         }
+        // 【V2】这一步很重要：把票还给票池。
+        // 只在「下单时扣、成功后不管」是不行的 —— 用户反复下单取消几次，
+        // 票池就被这些「没成交的占位」耗光了，票一张没卖出去却谁也买不了。
+        // 这在概念上和「内存泄漏」是一回事：借了没还。
+        //
+        // 【为什么只有 cancel 回补，pay 不回补】
+        // 支付成功意味着票真的卖出去了，库存占用应该【固化】下来；
+        // 只有「交易没走成」（取消/超时关闭）才需要把资源还回去。
+        // 这也是为什么 V3 迁移脚本回填库存时只统计 status='paid' 的订单。
         order.setStatus("closed");
         order.setUpdatedAt(LocalDateTime.now());
         orderMapper.updateById(order);
+        matchInfoMapper.restoreStock(order.getMatchId(), order.getQuantity());
     }
 
     /**
