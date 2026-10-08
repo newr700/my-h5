@@ -46,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -63,6 +63,12 @@ const displayName = computed(
   () => userStore.profile?.nickname || userStore.profile?.username || '已登录'
 )
 const avatarText = computed(() => (displayName.value || '?').charAt(0).toUpperCase())
+
+// 应用启动 / 刷新页面后：若本地有 token 则拉资料恢复登录态，
+// 否则刷新后 store 重建、profile 为 null，右上角又会显示「未登录」
+onMounted(() => {
+  userStore.restore()
+})
 
 function onCommand(command: string) {
   if (command === 'profile') {

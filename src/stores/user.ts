@@ -24,8 +24,12 @@ export const useUserStore = defineStore('user', () => {
   const profile = ref<UserProfile | null>(null)
   const loading = ref(false)
 
-  // 计算属性：全项目判断「登录没」只看这一个，不散落各处 localStorage 直读
-  const isLoggedIn = computed(() => !!localStorage.getItem(TOKEN_KEY))
+  // 计算属性：全项目判断「登录没」只看这一个。
+  // ⚠️ 关键修复点（旧实现是 !!localStorage.getItem(TOKEN_KEY)）：localStorage 不是 Vue 的响应式数据源，
+  //   computed 读它不会建立响应式依赖，登录后 setItem 改了 localStorage 也不会触发重算，
+  //   于是右上角的 v-if="isLoggedIn" 永远停在「未登录」（这正是「登录后还显示未登录」的 bug）。
+  //   改为依赖响应式的 profile：登录后 profile 被赋值即变 true，登出时 profile 置空即变 false。
+  const isLoggedIn = computed(() => !!profile.value)
 
   /** 登录：拿 token → 存 token → 拉资料。任何一步失败都不留半截状态 */
   async function login(username: string, password: string) {
@@ -61,5 +65,20 @@ export const useUserStore = defineStore('user', () => {
     profile.value = null
   }
 
-  return { profile, loading, isLoggedIn, login, register, loadProfile, logout }
+  /**
+   * 启动 / 刷新页面后恢复登录态：本地有 token 就拉一次资料把 profile 补回来，
+   * 否则刷新后 store 重建、profile 为 null，isLoggedIn 又会变回 false（「已登录却显示未登录」）。
+   * token 失效（1101/1102）由 request.ts 拦截器统一清 token + 跳登录，这里静默吞掉即可。
+   */
+  async function restore() {
+    if (localStorage.getItem(TOKEN_KEY)) {
+      try {
+        await loadProfile()
+      } catch {
+        /* 交给拦截器处理 */
+      }
+    }
+  }
+
+  return { profile, loading, isLoggedIn, login, register, loadProfile, logout, restore }
 })
