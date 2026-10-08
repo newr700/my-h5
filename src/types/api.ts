@@ -30,6 +30,15 @@ export interface UserProfile {
   createdAt: string
   /** 头像相对路径（如 /uploads/12_xxx.png）；空串表示未设置，前端显示首字母占位 */
   avatarUrl?: string
+  /**
+   * 用户等级 —— V7 新增（对应后端 user/UserLevels.java）
+   * 1 = 普通球迷（NORMAL），2 = 行业专家（EXPERT）。
+   * 只有 Lv.2 以上能在「权威解析」页发表评论。
+   *
+   * 注意：前端拿它只决定【要不要显示评论输入框】（体验层）；
+   * 真正的拦人由后端等级守卫完成 —— 前端的锁防君子，后端的锁防所有人。
+   */
+  userLevel?: number
 }
 
 /** 登录/注册成功的响应（对应 auth/vo/LoginVo.java） */
@@ -109,4 +118,127 @@ export interface TeamStanding {
    * 但我们保证归一化后它一定是 string：没图就是 ''，页面据此决定显示图片还是排名圆圈。
    */
   logoUrl: string
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 英超预测模块（V7 新增）
+// 对应后端 com.myh5.server.prediction 包下的各 VO
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * 球队简要信息（对应 prediction/vo/TeamBriefVo.java）
+ *
+ * 凡是「显示队徽 + 队名」的地方都复用它：历届战绩的三个名次、夺冠次数榜、AI 预测的球队行。
+ * 抽出来的价值是「契约只写一次」——以后加字段三处同时生效，不会漏掉某一处显示不出来。
+ *
+ * 契约要点：
+ * - 颜色是 #RRGGBB 字符串，直接就是合法的 CSS 颜色值，前端不用再做映射；
+ * - 没图时 logoUrl 是 '' 而不是 null，前端靠它决定「显示图片还是兜底图形」。
+ */
+export interface TeamBrief {
+  teamName: string
+  /** 三字母缩写（ARS / MCI …），队徽上的文字兜底就靠它 */
+  shortName: string
+  colorPrimary: string
+  colorSecondary: string
+  logoUrl: string
+}
+
+/**
+ * 一个维度的分数（对应 vo/DimScoreVo.java）
+ *
+ * 同一个形状代表两种含义，靠接口路径区分，不重复定义两个类型：
+ * - /teams 里：这支球队在该维度的得分
+ * - /algorithm 里：该维度的权重（合计 100）
+ */
+export interface DimScore {
+  /** 维度 key，如 'history' / 'star' */
+  key: string
+  /** 中文名，如 '历史夺冠次数' */
+  label: string
+  score: number
+}
+
+/** 明星球员（对应 vo/StarPlayerVo.java） */
+export interface StarPlayer {
+  playerName: string
+  position: string
+  jerseyNumber: number
+  /** 没照片时是 ''，前端用「球衣号 + 姓名首字」圆牌兜底 */
+  photoUrl: string
+}
+
+/** AI 预测条目（对应 vo/TeamPredictionVo.java） */
+export interface TeamPrediction {
+  /** 排名 —— 后端生成（列表已按概率倒序），前端直接显示，不自己算 */
+  rank: number
+  teamName: string
+  teamNameEn: string
+  shortName: string
+  colorPrimary: string
+  colorSecondary: string
+  logoUrl: string
+  /**
+   * 夺冠概率百分数（0~100）—— 由后端按六维加权现算出来的，不是数据库里的字段。
+   * 存一份「算好的概率」等于存了两份可能打架的真相，所以这里只传结果不存底稿。
+   */
+  winProbability: number
+  /** 六个维度的得分，顺序 = 雷达图六个顶点的顺时针顺序，照顺序画即可 */
+  dims: DimScore[]
+  /** 可能是空数组（只有头部球队配了球员），页面必须能优雅显示空态 */
+  starPlayers: StarPlayer[]
+}
+
+/** 专家观点卡片（对应 vo/ExpertAnalysisVo.java） */
+export interface ExpertAnalysis {
+  id: number
+  /** 专家英文名，如 Martin Tyler */
+  nameEn: string
+  /** 专家中文名，如 马丁·泰勒 —— 页面上的「中/英切换」切的就是用哪个字段 */
+  nameCn: string
+  /** 他支持的那支球队（中文名） */
+  teamName: string
+  teamNameEn: string
+  shortName: string
+  colorPrimary: string
+  colorSecondary: string
+  logoUrl: string
+  /** 支持这支队的理由 */
+  reason: string
+  /** 没头像时是 ''，前端用姓名首字母占位 */
+  avatarUrl: string
+  /** 已有评论条数 —— 后端一次 IN 聚合查回来的，不是前端数出来的 */
+  commentCount: number
+}
+
+/** 专家评论（对应 vo/ExpertCommentVo.java） */
+export interface ExpertComment {
+  id: number
+  analysisId: number
+  /** 可能为 null：种子数据里的演示评论没有真实用户 */
+  userId: number | null
+  nickname: string
+  /** 【发布当时】的等级快照 —— 事后降级不该改写这条评论的等级标记 */
+  userLevel: number
+  content: string
+  createdAt: string
+}
+
+/** 历届战绩一行（对应 vo/SeasonHistoryVo.java） */
+export interface SeasonHistory {
+  /** 届数（第 33 届），官方口径 */
+  edition: number
+  /** 赛季起始年份，如 2024 */
+  seasonYear: number
+  /** 人看球习惯的说法，如 "2024-25"；这个拼接由后端做好，前端不自己拼 */
+  seasonLabel: string
+  champion: TeamBrief
+  runnerUp: TeamBrief
+  third: TeamBrief
+}
+
+/** 夺冠次数榜一项（对应 vo/TitleCountVo.java） */
+export interface TitleCount {
+  team: TeamBrief
+  count: number
 }

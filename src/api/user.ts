@@ -24,3 +24,21 @@ export async function uploadAvatar(file: File): Promise<UploadAvatarResult> {
   const avatarUrl = await post<string>('/user/avatar', form)
   return { avatarUrl }
 }
+
+/**
+ * 申请成为行业专家（V7 新增，对应 Java UserController 的 /user/expert-apply）。
+ *
+ * ── 为什么返回 void 而不是返回新等级 ─────────────────────
+ * 让 store 去重新拉一次 /user/profile，而不是相信这次返回的那个数字：
+ * 用户等级只有一个权威来源。本地顺手改一下看似省事，
+ * 但刷新页面就会露馅 ——「写完假装成功」是最难查的一类 bug。
+ *
+ * ── 与真实业务的边界 ────────────────────────────────────
+ * 本项目是【模拟审核】：调用一次即通过，方便演示权限流转。
+ * 真实系统里这一步应当只提交申请、由管理员审批，
+ * 那时返回体应该是「申请状态」而不是直接改等级 —— 这里的调用方不用改，
+ * 因为是否真的升级了，一律以重新拉取的资料为准。
+ */
+export async function applyExpert(): Promise<void> {
+  await post<unknown>('/user/expert-apply')
+}

@@ -46,6 +46,11 @@ export async function fetchUserProfile(): Promise<UserProfile> {
     nickname: asString(raw.nickname, 'profile.nickname'),
     createdAt: asString(raw.createdAt, 'profile.createdAt'),
     // 头像属于「展示类次要字段」：缺失/类型错时用兜底值 ''，不阻断资料加载
-    avatarUrl: asString(raw.avatarUrl, 'profile.avatarUrl', '')
+    avatarUrl: asString(raw.avatarUrl, 'profile.avatarUrl', ''),
+    // V7 新增：用户等级 —— 1 普通球迷 / 2 行业专家（常量见后端 user/UserLevels.java），
+    //   决定用户能不能在「权威解析」页发表评论。
+    // 特意用【宽松模式】兜底成普通球迷：这个字段要是没带回来，后果不该是「资料加载失败」
+    //   （那会让右上角一直显示未登录），而只是「暂时不能发评论」这种局部降级。
+    userLevel: asNumber(raw.userLevel, 'profile.userLevel', 1)
   }
 }

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { fetchUserProfile, login as apiLogin, register as apiRegister } from '@/api/auth'
+import { applyExpert as apiApplyExpert } from '@/api/user'
 import type { UserProfile } from '@/types/api'
 
 /**
@@ -20,6 +21,9 @@ import type { UserProfile } from '@/types/api'
 
 const TOKEN_KEY = 'token'
 
+/** 行业专家的门槛等级 —— 与后端 user/UserLevels.java 的 EXPERT 保持一致 */
+const USER_LEVEL_EXPERT = 2
+
 export const useUserStore = defineStore('user', () => {
   const profile = ref<UserProfile | null>(null)
   const loading = ref(false)
@@ -30,6 +34,15 @@ export const useUserStore = defineStore('user', () => {
   //   于是右上角的 v-if="isLoggedIn" 永远停在「未登录」（这正是「登录后还显示未登录」的 bug）。
   //   改为依赖响应式的 profile：登录后 profile 被赋值即变 true，登出时 profile 置空即变 false。
   const isLoggedIn = computed(() => !!profile.value)
+
+  /**
+   * 是否是行业专家（Lv.2）—— 决定「权威解析」页要不要显示评论输入框。
+   *
+   * ⚠️ 这只是【界面层】的隐藏，不是权限控制。
+   * 真正的判定在后端 addComment 里做：就算有人改 JS 把输入框显示出来，
+   * 发过去的请求照样会被后端的等级守卫拦下并返回 6002。
+   */
+  const isExpert = computed(() => (profile.value?.userLevel ?? 1) >= USER_LEVEL_EXPERT)
 
   /** 登录：拿 token → 存 token → 拉资料。任何一步失败都不留半截状态 */
   async function login(username: string, password: string) {
@@ -50,6 +63,23 @@ export const useUserStore = defineStore('user', () => {
     loading.value = true
     try {
       profile.value = await fetchUserProfile()
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 申请成为行业专家（V7 新增）。
+   *
+   * 成功后【必须重新拉取资料】，而不是把本地 userLevel 直接改成 2 ——
+   * 本地改一个数字固然简单，但那是「假装数据库已经变了」，
+   * 刷新页面立刻穿帮。写操作和读回填分离，状态才不会漂移。
+   */
+  async function applyExpert() {
+    loading.value = true
+    try {
+      await apiApplyExpert()
+      await loadProfile()
     } finally {
       loading.value = false
     }
@@ -80,5 +110,16 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  return { profile, loading, isLoggedIn, login, register, loadProfile, logout, restore }
+  return {
+    profile,
+    loading,
+    isLoggedIn,
+    isExpert,
+    login,
+    register,
+    loadProfile,
+    applyExpert,
+    logout,
+    restore
+  }
 })

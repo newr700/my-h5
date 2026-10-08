@@ -20,6 +20,10 @@
     <el-menu-item index="/user">我的</el-menu-item>
     <el-menu-item index="/order">购票</el-menu-item>
     <el-menu-item index="/standings">积分榜</el-menu-item>
+    <!-- V7 新增：草图三张页面。同样走 router 模式，当前页自动高亮 -->
+    <el-menu-item index="/analysis">权威解析</el-menu-item>
+    <el-menu-item index="/prediction">AI 预测</el-menu-item>
+    <el-menu-item index="/history">历史回顾</el-menu-item>
 
     <!-- 右侧登录态：靠 margin-left:auto 推到最右 -->
     <div class="nav-right">
@@ -87,6 +91,11 @@ function onCommand(command: string) {
 </script>
 
 <style scoped>
+/* 入口从 3 个增到 6 个：窄屏允许换行，避免菜单项被挤扁或溢出容器。
+   宁可占两行，也不让用户以为某个入口不存在 */
+.app-nav {
+  flex-wrap: wrap;
+}
 /* el-menu 本身是 flex 容器，品牌名和右侧区都是它的子节点，可直接参与布局 */
 .brand {
   font-weight: 700;

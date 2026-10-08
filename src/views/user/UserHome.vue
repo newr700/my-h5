@@ -4,6 +4,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { uploadAvatar } from '@/api/user'
+// 模板里第 91 行要用 avatarSrc() 拼出可访问的头像地址。
+// 原先漏了这一行 import，模板会当成「未定义的变量」——编译期 TS 报错，
+// 运行时则是 avatarSrc is not defined，整个用户中心页直接白掉。
+import { avatarSrc } from '@/utils/avatar'
 
 /**
  * 用户中心（PRD-F8）。
