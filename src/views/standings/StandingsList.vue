@@ -187,7 +187,7 @@ function rankBadgeClass(team: TeamStanding) {
 .page {
   min-height: 100vh;
   background: #ffffff;
-  padding: 0 16px;
+  padding: 0 24px;
 }
 
 /* 标题栏：左标题，右侧是「刷新按钮 + 图例」 */
@@ -339,7 +339,7 @@ function rankBadgeClass(team: TeamStanding) {
  */
 @media (min-width: 768px) {
   .page {
-    padding: 0 24px;
+    padding: 0 48px;
   }
 
   .titlebar {
