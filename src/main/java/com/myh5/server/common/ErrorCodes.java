@@ -58,6 +58,20 @@ public final class ErrorCodes {
     /** 文件上传：类型不支持（只允许 jpg / png / webp） */
     public static final int FILE_TYPE_INVALID = 4002;
 
+    /**
+     * V7 内容域（英超预测：权威解析 / 评论）。
+     *
+     * 【为什么单开 6xxx 而不是接着 4xxx 往下排】
+     * 错误码分段是给「看日志的人」用的分类手段：看到 2001 就知道是账号问题，
+     * 看到 3003 就知道是交易问题。新模块（内容/社区）与前缀无关，
+     * 单开一段比挤在 4xxx（文件上传）后面更容易形成直觉。
+     * 段号本身没有技术含义，重要的是【一致性】：同一模块永远用同一段。
+     */
+    /** 权威解析不存在（评论挂到了一个不存在的解析上） */
+    public static final int ANALYSIS_NOT_FOUND = 6001;
+    /** 权限不足：用户等级低于发表评论所需的行业专家等级 */
+    public static final int COMMENT_LEVEL_INSUFFICIENT = 6002;
+
     /** 系统内部错误（未捕获异常兜底，细节只进日志，绝不透出堆栈） */
     public static final int SYSTEM_ERROR = 5000;
 }

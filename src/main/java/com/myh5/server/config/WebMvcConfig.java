@@ -35,7 +35,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(authInterceptor)
-                .addPathPatterns("/order/**", "/user/**");
+                .addPathPatterns("/order/**", "/user/**")
+                // V7 新增：发表评论是写操作，必须登录。
+                // 注意这里保护的是【一个具体路径】而不是整个 /prediction/** ——
+                // 三个读接口（权威解析 / AI 预测 / 历史回顾）是公开的，
+                // 为了一个写接口把整段读接口关起来，会让没登录的人什么都看不到。
+                // 通配符 * 只匹配一层路径段，所以 /prediction/analysis/12/comment 命中，
+                // 而 /prediction/analysis/12/comments（读）不命中 —— 一字之差，正是我们要的区分。
+                .addPathPatterns("/prediction/analysis/*/comment");
         // /standings、/matches、/auth/**、/doc.html、/v3/api-docs、/uploads/** 等公开端点不在名单里，直接放行
     }
 

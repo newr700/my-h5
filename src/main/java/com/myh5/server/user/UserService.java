@@ -4,6 +4,7 @@ import com.myh5.server.common.BizException;
 import com.myh5.server.common.ErrorCodes;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -33,6 +34,62 @@ public class UserService {
                        @Value("${app.upload-dir}") String uploadDir) {
         this.userMapper = userMapper;
         this.uploadDir = uploadDir;
+    }
+
+    /**
+     * 读当前用户资料（含等级）。
+     *
+     * 把「查不到人怎么办」的判断收进 Service，让 Controller 彻底变成三行 ——
+     * 顺带的好处是这个判断只有一处，profile 与 expertApply 不会出现两种口径。
+     */
+    public UserProfileVo profile(Long userId) {
+        return toVo(requireUser(userId));
+    }
+
+    /**
+     * 申请成为行业专家（V7 新增）。
+     *
+     * ⚠️ 这是一处【刻意的简化】，必须写清楚：
+     * 真实系统里「升级行业专家」应该是提交资料 → 管理员审批 → 生效的流程，
+     * 并且审批接口只能由管理员调用。本项目没有后台管理端，为了让他把
+     * 「高等级用户可发评论」这个功能亲眼跑通（而不是永远卡在 Lv.1 看不到输入框），
+     * 这里做成「一点即通过」的模拟审核。
+     *
+     * 升级后必须【回读数据库】再返回，不能用内存里改过的对象：
+     * updateById 实际是否写成功、有没有被别的字段覆盖，只有再查一次才说了算 ——
+     * 「写完立刻假装成功」是接口骗人最常见的形态（前端显示已升级，刷新又变回去）。
+     */
+    @Transactional
+    public UserProfileVo applyExpert(Long userId) {
+        UserEntity user = requireUser(userId);
+        int current = user.getUserLevel() == null ? UserLevels.NORMAL : user.getUserLevel();
+
+        // 已经是专家就不重复写库：写操作要「幂等」——同一个请求打两次，结果和副作用都该一样
+        if (current < UserLevels.EXPERT) {
+            UserEntity update = new UserEntity();
+            update.setId(userId);
+            update.setUserLevel(UserLevels.EXPERT);
+            // updateById 默认只更新非空字段，所以这里只会改 user_level 一列
+            userMapper.updateById(update);
+            user = requireUser(userId);
+        }
+        return toVo(user);
+    }
+
+    private UserEntity requireUser(Long userId) {
+        UserEntity user = userMapper.selectById(userId);
+        if (user == null) {
+            // token 合法但账号没了：按未登录处理（与 UserController 原来的口径一致）
+            throw new BizException(ErrorCodes.UNAUTHORIZED, "账号不存在，请重新登录");
+        }
+        return user;
+    }
+
+    /** Entity → VO 的唯一出口：等级缺失时按最低等级兜底，绝不下发 null 让前端判空 */
+    private UserProfileVo toVo(UserEntity user) {
+        int level = user.getUserLevel() == null ? UserLevels.NORMAL : user.getUserLevel();
+        return new UserProfileVo(user.getId(), user.getUsername(), user.getNickname(),
+                user.getCreatedAt(), user.getAvatarUrl(), level);
     }
 
     /**

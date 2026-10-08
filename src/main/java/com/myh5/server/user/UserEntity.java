@@ -39,5 +39,15 @@ public class UserEntity {
     @TableField("avatar_url")
     private String avatarUrl;
 
+    /**
+     * 用户等级（V7 新增）：1=普通球迷 2=行业专家。
+     *
+     * 它是「能不能在权威解析下发评论」的依据，所以前端需要知道它 ——
+     * 于是它必须出现在 UserProfileVo 里（见那里的注释）。
+     * 数据库列名是 user_level（level 在 SQL 里跟保留词套近乎，没必要）。
+     */
+    @TableField("user_level")
+    private Integer userLevel;
+
     private LocalDateTime createdAt;
 }
