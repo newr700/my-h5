@@ -1,0 +1,25 @@
+# 生产环境配置
+# ⚠️ 安全清单第一条：生产必须关闭接口文档页。
+# /doc.html 会把所有接口连同"在线调试"能力一起暴露给公网，
+# 这是 Java 项目最常见的裸奔事故（工程手册 / 选型文档 2.3 坑二）。
+knife4j:
+  enable: true
+  production: true
+
+spring:
+  datasource:
+    # 三个值全部来自部署平台的环境变量，一个字符都不许出现在代码里 ——
+    # 代码会进 git、会被截图、会被离职员工带走；环境变量不会
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+# 生产关掉 SQL 日志：每请求多条日志在高并发下是纯性能损耗，
+# 而且 SQL 里的参数可能含用户数据，不该进日志文件
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl

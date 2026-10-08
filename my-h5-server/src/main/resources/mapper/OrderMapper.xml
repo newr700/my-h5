@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  订单模块的手写 SQL —— 工程手册裁定：复杂查询（多表 JOIN）不用 MP 的 Wrapper 硬凑，
+  老老实实写 XML。好处：
+    ① SQL 全文可见，能用 EXPLAIN 分析、能直接复制到 MySQL 客户端里调试；
+    ② 面试时指着它讲 JOIN、讲索引（WHERE user_id 命中 idx_match_order_user）；
+    ③ #{} 是预编译占位符（PreparedStatement），不是字符串拼接 ——
+       SQL 注入防线的根基。绝不用 ${} 拼用户输入，那是注入敞开的门。
+-->
+<mapper namespace="com.myh5.server.order.OrderMapper">
+
+    <!-- 联表查「我的订单」：订单为主，LEFT JOIN 拿比赛的标题信息。
+         用 LEFT JOIN 而不是 JOIN：比赛被下架/删除后，历史订单依然要能查出来 ——
+         订单是「发生过的事实」，不该因为关联数据消失而消失 -->
+    <select id="selectMyOrders" resultType="com.myh5.server.order.OrderDetailRow">
+        SELECT
+            o.id,
+            o.order_no      AS orderNo,
+            m.home_team     AS homeTeam,
+            m.away_team     AS awayTeam,
+            m.match_time    AS matchTime,
+            o.quantity,
+            o.unit_price    AS unitPrice,
+            o.total_amount  AS totalAmount,
+            o.status,
+            o.created_at    AS createdAt
+        FROM match_order o
+        LEFT JOIN match_info m ON m.id = o.match_id
+        WHERE o.user_id = #{userId}
+        ORDER BY o.id DESC
+        <!-- 注意：没有 LIMIT —— MP 分页插件看到 IPage 参数会自动补上，自己写就重复了 -->
+    </select>
+
+</mapper>

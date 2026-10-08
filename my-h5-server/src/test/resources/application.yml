@@ -1,0 +1,32 @@
+# 测试环境配置 —— 整个 src/test 用一个内存 H2，与本地 MySQL 完全隔离。
+#
+# ── 为什么测试不连真 MySQL ─────────────────────────────────
+# ① CI 服务器上没有你的 MySQL，测试必须在任何机器上都能跑；
+# ② 测试会反复造数据，连真库等于污染开发数据；
+# ③ H2 是内存库，跑完即焚，天然满足「测试之间互不影响」。
+#
+# MODE=MySQL：让 H2 用 MySQL 方言解析 SQL，这样 Flyway 的 V1/V2 迁移脚本
+# 可以一字不改地执行 —— 测试的表结构和生产一模一样，这是「测的东西是真的」的前提。
+spring:
+  datasource:
+    url: jdbc:h2:mem:my_h5_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+# 测试用小密钥（够用即可，与开发/生产都不同）
+jwt:
+  secret: test-secret-key-for-h2-tests-0123456789abcdef
+  expire-seconds: 7200
+
+# 测试里保留 SQL 日志，断言失败时能看到实际执行的 SQL
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 测试上传目录：指向 target 下，跑完即焚，不污染项目根目录，也不进 git
+app:
+  upload-dir: target/test-uploads

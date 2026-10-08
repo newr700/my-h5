@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  评论模块的手写 SQL。
+  为什么这条查询值得写 XML：它有 <foreach> 动态元素（IN 的元素个数由入参决定），
+  在注解里拼这种字符串没有高亮、没有格式化、改个引号就崩 —— 到这类 SQL 就该搬进 XML。
+-->
+<mapper namespace="com.myh5.server.prediction.ExpertCommentMapper">
+
+    <!--
+      批量统计「每条解析有多少条评论」。
+
+      【为什么不能按解析逐条 selectCount】
+      那是最典型的 N+1：列表有 6 条解析就是 6 次数据库往返。
+      这里一次 IN + GROUP BY 把全部计数换回来，往返次数与解析条数无关。
+
+      【WHERE analysis_id IN (...) 能命中索引吗】
+      能。V7 建的 idx_expert_comment_analysis 正好覆盖这个条件，
+      GROUP BY 也可以直接利用索引的有序性，不用额外排序。
+      换一种写法（WHERE 里对该列做函数运算，如 DATE(created_at)=...）就会索引失效 ——
+      索引失效最隐蔽的原因，就是把列包进了函数里。
+    -->
+    <select id="countByAnalysisIds" resultType="com.myh5.server.prediction.AnalysisCommentCountRow">
+        SELECT
+            analysis_id    AS analysisId,
+            COUNT(*)       AS commentCount
+        FROM expert_comment
+        WHERE analysis_id IN
+        <foreach collection="analysisIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        GROUP BY analysis_id
+    </select>
+
+</mapper>

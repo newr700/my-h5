@@ -1,0 +1,64 @@
+# 主配置：与环境无关的项放这里；差异项放 application-dev.yml / application-prod.yml
+#
+# ── 给读者的地图 ─────────────────────────────────────────────
+# 这份文件回答的是「不管在哪台机器上跑，都一样的事」：
+#   端口、Jackson 时间格式、MyBatis-Plus 行为、JWT 的默认值、文件上传上限。
+# 「在哪台机器上跑才定下来的事」（数据库地址、密钥、文档开关、上传目录）
+# 全部推到 application-dev.yml / application-prod.yml ——
+# 这就是工程手册第 6 章「配置与环境分离」：代码里不许出现环境相关的字面量。
+spring:
+  application:
+    name: my-h5-server
+  profiles:
+    active: dev
+  # 时间格式全局裁定（工程手册 4.3）：对外一律字符串 "yyyy-MM-dd HH:mm:ss"，东八区。
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+  # ── 文件上传（头像）──────── 单文件 / 整体请求都限 2MB，头像用不着更大；
+  #   超限 Spring 直接拒绝（前端 before-upload 也拦一道作友好提示）
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
+
+server:
+  port: 8080
+
+# ── MyBatis-Plus 行为配置 ────────────────────────────────────
+mybatis-plus:
+  # 手写 XML 的位置（OrderMapper.xml 这种复杂查询）。不写这行 MP 找不到 XML，
+  # 调用对应方法时报 "Invalid bound statement (not found)" —— MP 新手报错榜第一名
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    # 下划线转驼峰：数据库列名 team_name ↔ Java 属性 teamName。
+    map-underscore-to-camel-case: true
+    # 把执行的 SQL 打到控制台（仅 dev 生效会有性能损失；prod 里关掉）。
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      # 主键策略：AUTO = 用数据库自增列。
+      id-type: auto
+
+# ── JWT 配置（W3 鉴权）──────────────────────────────────────
+# 密钥绝不能写死在代码里提交进 git —— 从环境变量读，读不到才用开发默认值。
+jwt:
+  # HS256 要求密钥至少 256 位（32 字节），太短 jjwt 会直接拒绝。
+  secret: ${JWT_SECRET:dev-only-secret-do-not-use-in-prod-0123456789abcdef}
+  # 令牌有效期 2 小时（PRD 裁定：无 refresh token 是已知简化）。
+  expire-seconds: 7200
+
+# ── 头像上传目录（自定义配置，@Value 读取）──────────────────
+# 头像文件存本地磁盘，WebMvcConfig 把 /uploads/** 映射成可访问 URL。
+# 相对路径（相对后端启动目录 my-h5-server），开发落在 ./uploads（已 gitignore）。
+# 生产改成绝对路径如 /var/my-h5/uploads。
+app:
+  upload-dir: ./uploads
+
+# Actuator：只暴露 health。
+# 暴露 env/metrics 等端点会泄漏配置（含密钥）——这是真实安全事故的高发点
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
