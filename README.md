@@ -58,6 +58,93 @@
 
 > 依赖版本统一收敛在 `pom.xml` 的 `<properties>`（工程手册第 8 章：依赖引入原则）。每个依赖"为什么选、为什么是这个值"在 `pom.xml` 注释里有逐条说明，也与前端仓库 `docs/后端架构与上线全流程路线.md`、`ADR-004`、`ADR-005` 互相对应。
 
+## 架构概览
+
+按功能分包，分层红线清晰：
+
+| 包 | 职责 |
+|---|---|
+| `auth` | JWT 签发验签、登录注册、认证拦截器 |
+| `user` | 用户实体与 Mapper |
+| `match` | 比赛（场次）查询与库存 |
+| `order` | 下单 / 取消 / 支付 写闭环 |
+| `standings` | 示例积分榜接口 |
+| `common` | 统一响应 `Result`、业务异常 `BizException`、全局异常处理器 `GlobalExceptionHandler`、错误码 `ErrorCodes` |
+| `config` | CORS、MyBatis-Plus、Jackson、WebMvc 等配置 |
+
+**分层红线**：Controller → Service → Mapper，不允许反向或跨层直调；出入参用 DTO/VO 隔离，不把 Entity 直接出网。所有业务错误走 `BizException` + 错误码，由 `GlobalExceptionHandler` 统一包成 `{code,message,data}`。
+
+**横切**：`AuthInterceptor` 校验 JWT 并写入 `AuthContext`（ThreadLocal）；`RequestContextInterceptor` 采集 IP/UA 写入 `RequestContext`。两个上下文**用后必须 clear**，否则线程复用会串数据。
+
+## 数据库迁移（Flyway）
+
+表结构变更全部写成迁移脚本，放在 `src/main/resources/db/migration/`，**只增不改、绝不允许改名或删除已应用的迁移**：
+
+| 脚本 | 作用 |
+|---|---|
+| `V1__init.sql` | 建表（user / match_info / match_order / team_standing 等） |
+| `V2__seed.sql` | 灌入 8 场比赛初始数据 |
+| `V3__stock.sql` | 给 `match_info` 加 `total_stock` / `stock` 库存字段（V2 Step1 防超卖） |
+| `V4__idempotency.sql` | 规划中：订单 `request_id` + 唯一索引（V2 Step2 幂等） |
+| `V5__audit.sql` | 规划中：审计日志表（V2 Step3 审计） |
+
+## 错误码
+
+`common/ErrorCodes.java` 是错误码的唯一来源（前端 `request.ts` 对 1101/1102 有特殊处理）：
+
+| 码 | 含义 |
+|---|---|
+| 1001 | 参数校验失败 |
+| 1002 | 资源不存在 |
+| 1101 | 未登录 / token 缺失或非法 |
+| 1102 | token 已过期（前端跳登录） |
+| 2001 | 注册：用户名已存在 |
+| 2002 | 登录：用户名或密码错误（模糊，防枚举） |
+| 3001 | 订单不存在（或不是你的，故意同码防枚举） |
+| 3002 | 订单状态机守卫：当前状态不允许该操作 |
+| 3003 | 库存不足（V2 Step1 新增） |
+| 5000 | 系统内部错误（细节仅进日志） |
+
+## 项目状态与实施进度（V2 正确性加固）
+
+V2 是把「能跑通」升级为「真实场景不出错」的阶段，拆成三次独立交付，每步固定走「讲清楚 → 写代码 → 跑测试 → git 提交」：
+
+| Step | 目标 | 状态 | 迁移脚本 | 提交 |
+|---|---|---|---|---|
+| Step 1 | 防超卖（并发抢票不超卖） | 已完成 | `V3__stock.sql` | `1e2ea8e` |
+| Step 2 | 幂等（同一请求只处理一次，防重复下单） | 已完成 | `V4__idempotency.sql` | `9a3f641` |
+| Step 3 | 审计日志（谁改了什么可追溯） | 未开始 | `V5__audit.sql` | — |
+
+- **防超卖（已完成）**：`MatchInfoMapper.deductStock` 用「带条件的原子 UPDATE」（`WHERE stock >= qty`）靠行锁消除并发下的 TOCTOU；下单先扣库存，取消回补，支付不回补。`StockIntegrationTest` 6 项验证。
+- **幂等（已完成）**：`CreateOrderRequest` 携带必填 `requestId`（@NotBlank），订单表加 `(user_id, request_id)` 唯一索引；下单前按 `(userId, requestId)` 预检，命中返还原订单且不重复扣库存，撞索引回滚并抛 3004 让前端重试。前端 `api/order.ts` 用 `pendingRequestId`（成功清空、失败保留）配合。测试见 `IdempotencyIntegrationTest`（5 项）。
+- **审计（未开始）**：计划记录关键操作的 actor / action / 时间 / IP，便于追溯与排障。
+
+## 测试
+
+```bash
+mvn clean test
+```
+
+- 在 H2（MySQL 兼容模式）下跑**同一份** Flyway 迁移，保证测的是真实表结构、不依赖本机 MySQL。
+- 当前 **21/21 全绿**（ApiFlow 10 + JWT 4 + 冒烟 1 + 库存集成 6）。
+- 用系统 PowerShell / Windows Terminal 跑（本机 AI 会话内置终端跑不了 mvn，已知环境问题）。
+- 切分支 / 回退后务必 `mvn clean`，否则 `target/classes` 残留旧迁移脚本会导致 Flyway 报「找到多个相同版本的迁移」。
+
+## 接口一览
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/actuator/health` | 探活 |
+| GET | `/doc.html` | knife4j 接口文档与调试页（生产须关闭） |
+| GET | `/standings` | 示例积分榜 |
+| POST | `/api/auth/register` | 注册 |
+| POST | `/api/auth/login` | 登录，返回 JWT |
+| GET | `/api/match/matches` | 在售比赛列表（含 `totalStock` / `stock`） |
+| POST | `/api/order` | 下单 |
+| 其余 | `/api/order/**` | 订单查询 / 取消 / 支付（具体路径见 `/doc.html`） |
+
+> 完整字段与示例见 `/doc.html`，以实际代码为准。
+
 ## 快速开始
 
 **用 Windows 自带的 PowerShell 或 Windows Terminal**（本机 AI 会话的内嵌终端跑不了 mvn，已知环境问题）。
@@ -66,13 +153,14 @@
 mvn spring-boot:run
 ```
 
-启动后验证三处：
+启动后验证：
 
 | 地址 | 预期 |
 |---|---|
 | http://localhost:8080/actuator/health | `{"status":"UP"}` |
 | http://localhost:8080/doc.html | knife4j 接口文档页 |
 | http://localhost:8080/standings | `{"code":0,"message":"ok","data":[...]}` 示例积分榜 |
+| http://localhost:8080/api/match/matches | 在售比赛（含 `totalStock`/`stock`） |
 
 ## 与前端联调
 
@@ -85,6 +173,11 @@ mvn spring-boot:run
 mvn clean package
 java -jar target/my-h5-server-0.0.1-SNAPSHOT.jar
 ```
+
+## 分支模型
+
+- `main`：当前主力分支，含 V2 Step1 防超卖。
+- `archive/v2-draft-1`：存档分支，保留过一次「V2 全量草稿（幂等 + 防超卖 + 审计）」及更早的未提交工作，仅作对照与退路，不再加功能。
 
 ## 仓库角色
 
