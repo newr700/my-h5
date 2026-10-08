@@ -5,11 +5,13 @@
 ## 快速开始
 
 ```bash
-npm install        # 首次克隆后安装依赖
-npm run dev        # 起开发服务器
-npm run build      # 类型检查 + 生产打包
-npm run preview    # 本地预览打包产物
+npm install
+npm run dev
+npm run build
+npm run preview
 ```
+
+> ⚠️ 每条命令单独复制执行即可，**不要连带 `#` 后面的中文**——终端里 `#` 是注释符，连带复制会被当成 npm 的包名而报 `EINVALIDTAGNAME`（之前有人踩过这个坑）。
 
 要求 Node ≥ 20。开发时接口通过 Vite 代理转发到本地后端（默认 `http://localhost:8080`，见 `vite.config.ts`）。
 
@@ -105,10 +107,17 @@ src/
 2. **不许**改别人的模块目录 —— `user/` 是 A 的，`order/` 是 B 的，各扫门前雪。
 3. **不许**把密钥、密码写进任何代码文件 —— 只能放 `.env.local`（这个文件 git 不会提交）。
 
+## 头像上传
+
+- 后端提供 `POST /api/user/avatar`（字段名 `file`，仅 JPG/PNG/WebP，≤2MB），图片存到后端磁盘、DB 存相对路径 `/uploads/xxx.png`，由后端映射为可访问 URL。
+- 前端入口在「用户中心」页（`src/views/user/UserHome.vue`）的「更换头像」按钮：用原生 `<input type="file">` 选图，经自封装 axios（`src/api/user.ts` 的 `uploadAvatar`）上传——**不用 el-upload 自带 XHR**，因为它会绕过 token 拦截器与统一错误处理。
+- 头像显示：`src/utils/avatar.ts` 的 `avatarSrc()` 把后端相对路径按部署环境拼成可访问地址（dev 靠 Vite 的 `/uploads` 代理，prod 拼成绝对域名）；右上角（`App.vue`）与用户中心都优先显示图片，未设置时显示昵称首字母占位。
+- 开发时头像文件经 Vite 的 `/uploads` 代理转发到后端 8080（见 `vite.config.ts`）。
+
 ## 与后端联调
 
 - 本地后端主力是 **Java（my-h5-server，8080）**；Node 版 `my-h5-api`（3000）冻结保留作对照。
-- `vite.config.ts` 的 `server.proxy` 把 `/api` 转发到 `http://localhost:8080` 并去掉前缀（后端不配 context-path，前缀是代理层职责）。
+- `vite.config.ts` 的 `server.proxy` 把 `/api` 转发到 `http://localhost:8080` 并去掉前缀（后端不配 context-path，前缀是代理层职责）；同时把 `/uploads` 转发到 8080（不去掉前缀），供开发环境访问头像等静态资源。
 - 生产环境跨域走后端 CORS，或前后端同域部署。
 
 ## 协作
