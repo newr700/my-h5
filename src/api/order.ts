@@ -11,6 +11,20 @@ import type { MatchInfo, OrderItem, PageResult } from '@/types/api'
  * 金额永远以响应里后端算好的为准，前端不在本地算总价 —— 展示都未必需要算。
  */
 
+/**
+ * ── V2 第二步：幂等（防重复下单）──────────────────────────
+ * pendingRequestId 是「幂等号」的客户端一端：
+ *   · 发起一笔新下单时，若还没有号，就生成一个（crypto.randomUUID）；
+ *   · 下单【成功】→ 清空，下一笔用新号；
+ *   · 下单【失败】→ 保留，重试 / 用户再点时复用同一号。
+ * 后端按 (userId, requestId) 查到原订单就直接返回（不重复扣票），
+ * 唯一索引 (user_id, request_id) 在并发下兜底。详见后端 OrderService 注释与 V4__idempotency.sql。
+ *
+ * 为什么放在 api 层而不是页面层：requestId 是「一次下单意图」的凭证，
+ * 和请求封装同层，页面完全不用关心 —— 这也符合「请求细节收敛到唯一出口」的原则。
+ */
+let pendingRequestId: string | null = null
+
 /** 订单状态的全部合法值 —— 后端新增状态（如 refunded）会在这里被立刻拦下报错 */
 const ORDER_STATUSES = ['pending', 'paid', 'closed'] as const
 
@@ -78,10 +92,25 @@ export async function fetchOrders(pageNum = 1, pageSize = 50): Promise<PageResul
  * 创建订单 —— 注意请求体里【没有】金额。
  * 这是契约层面的安全设计：金额由后端拿 matchId 查库重算（PRD 5.2），
  * 前端想传都传不进去（DTO 白名单会丢弃多余字段）。
+ *
+ * V2 第二步：每次调用都带上 pendingRequestId（幂等号）。
+ * 成功 → 清空（下一笔换新号）；失败 → 保留（重试复用同一号 → 后端幂等命中）。
  */
 export async function createOrder(matchId: number, quantity: number): Promise<OrderItem> {
-  const raw = await post<unknown>('/order/create', { matchId, quantity })
-  return parseOrder(raw, 0)
+  // 没有进行中的号才新生成 —— 保证「一次下单意图」对应「一个号」
+  if (!pendingRequestId) {
+    // crypto.randomUUID 在现代浏览器（含 localhost 安全上下文）原生可用，无需引库
+    pendingRequestId = crypto.randomUUID()
+  }
+  const requestId = pendingRequestId
+  try {
+    const raw = await post<unknown>('/order/create', { matchId, quantity, requestId })
+    pendingRequestId = null // 成功：这笔完成，下一笔换新号
+    return parseOrder(raw, 0)
+  } catch (e) {
+    // 失败：保留 pendingRequestId，让「重试 / 用户再点」复用同一号 → 后端幂等命中
+    throw e
+  }
 }
 
 /** 支付（mock：推状态机 pending → paid） */
