@@ -17,3 +17,6 @@ application-local.yml
 
 # 日志
 *.log
+
+# 本地上传的头像文件（运行时生成，不进 Git；线上用绝对路径或对象存储）
+uploads/

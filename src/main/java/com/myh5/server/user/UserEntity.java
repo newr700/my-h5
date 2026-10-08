@@ -1,6 +1,7 @@
 package com.myh5.server.user;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -14,7 +15,6 @@ import java.time.LocalDateTime;
  * 但显式写出来，将来改类名不会悄悄改映射 —— 显式优于约定，关键处留证据。
  *
  * @Data 是 Lombok 注解：编译期自动生成 getter/setter/toString/equals。
- * 它不是反射，IDE 里 Ctrl+点击能跳到生成的源码（target/generated-sources）。
  */
 @Data
 @TableName("app_user")
@@ -29,6 +29,15 @@ public class UserEntity {
     private String passwordHash;
 
     private String nickname;
+
+    /**
+     * 头像相对路径（如 /uploads/12_1690000000000.png）。
+     * 列名是 snake_case avatar_url：MP 下划线转驼峰已开启，但显式 @TableField
+     * 写明列名最稳（哪天关了驼峰映射也不会变 null）。
+     * null/空 = 未设置头像，前端显示昵称首字母占位。
+     */
+    @TableField("avatar_url")
+    private String avatarUrl;
 
     private LocalDateTime createdAt;
 }

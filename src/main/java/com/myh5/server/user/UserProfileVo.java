@@ -7,6 +7,8 @@ public record UserProfileVo(
         long id,
         String username,
         String nickname,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        /** 头像相对路径（如 /uploads/12_xxx.png），null/空表示未设置 */
+        String avatarUrl
 ) {
 }

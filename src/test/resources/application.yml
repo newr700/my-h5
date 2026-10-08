@@ -26,3 +26,7 @@ jwt:
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 测试上传目录：指向 target 下，跑完即焚，不污染项目根目录，也不进 git
+app:
+  upload-dir: target/test-uploads

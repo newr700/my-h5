@@ -2,8 +2,8 @@
 #
 # ── 给读者的地图 ─────────────────────────────────────────────
 # 这份文件回答的是「不管在哪台机器上跑，都一样的事」：
-#   端口、Jackson 时间格式、MyBatis-Plus 行为、JWT 的默认值。
-# 「在哪台机器上跑才定下来的事」（数据库地址、密钥、文档开关）
+#   端口、Jackson 时间格式、MyBatis-Plus 行为、JWT 的默认值、文件上传上限。
+# 「在哪台机器上跑才定下来的事」（数据库地址、密钥、文档开关、上传目录）
 # 全部推到 application-dev.yml / application-prod.yml ——
 # 这就是工程手册第 6 章「配置与环境分离」：代码里不许出现环境相关的字面量。
 spring:
@@ -12,12 +12,15 @@ spring:
   profiles:
     active: dev
   # 时间格式全局裁定（工程手册 4.3）：对外一律字符串 "yyyy-MM-dd HH:mm:ss"，东八区。
-  # 为什么全局配置而不是每个字段加 @JsonFormat：
-  # 逐个加注解意味着「每新增一个时间字段都要记得加」，漏一个就是一种格式 ——
-  # 规范的价值在于不需要靠人的记性来维持。
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
+  # ── 文件上传（头像）──────── 单文件 / 整体请求都限 2MB，头像用不着更大；
+  #   超限 Spring 直接拒绝（前端 before-upload 也拦一道作友好提示）
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
 
 server:
   port: 8080
@@ -29,29 +32,28 @@ mybatis-plus:
   mapper-locations: classpath*:mapper/*.xml
   configuration:
     # 下划线转驼峰：数据库列名 team_name ↔ Java 属性 teamName。
-    # 这是 MP 默认开启的，显式写出来是为了让读者知道「这个魔术发生在这里」——
-    # 哪天查询结果某字段是 null，先怀疑列名和属性名没对上
     map-underscore-to-camel-case: true
     # 把执行的 SQL 打到控制台（仅 dev 生效会有性能损失；prod 里关掉）。
-    # 学 MyBatis 期间强烈建议开着：眼睛看着 MP 帮你生成的 SQL，
-    # 才知道它到底做了什么 —— ORM 最大的风险是「不知道底下跑了什么 SQL」（N+1 问题就是这么来的）
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
-      # 主键策略：AUTO = 用数据库自增列（建表时的 AUTO_INCREMENT）。
-      # 另一个常用选项 ASSIGN_ID 是雪花算法（分布式场景用，单库自增更简单可排序）
+      # 主键策略：AUTO = 用数据库自增列。
       id-type: auto
 
 # ── JWT 配置（W3 鉴权）──────────────────────────────────────
 # 密钥绝不能写死在代码里提交进 git —— 从环境变量读，读不到才用开发默认值。
-# ${JWT_SECRET:默认值} 是 Spring 的占位符语法：冒号后是兜底值。
-# 生产环境必须在部署平台配置 JWT_SECRET 环境变量，且与开发环境不同。
 jwt:
-  # HS256 要求密钥至少 256 位（32 字节），太短 jjwt 会直接拒绝 ——
-  # 这是算法库的善意强制，不是配置癖
+  # HS256 要求密钥至少 256 位（32 字节），太短 jjwt 会直接拒绝。
   secret: ${JWT_SECRET:dev-only-secret-do-not-use-in-prod-0123456789abcdef}
-  # 令牌有效期 2 小时（PRD 裁定：无 refresh token 是已知简化，面试要能说出代价）
+  # 令牌有效期 2 小时（PRD 裁定：无 refresh token 是已知简化）。
   expire-seconds: 7200
+
+# ── 头像上传目录（自定义配置，@Value 读取）──────────────────
+# 头像文件存本地磁盘，WebMvcConfig 把 /uploads/** 映射成可访问 URL。
+# 相对路径（相对后端启动目录 my-h5-server），开发落在 ./uploads（已 gitignore）。
+# 生产改成绝对路径如 /var/my-h5/uploads。
+app:
+  upload-dir: ./uploads
 
 # Actuator：只暴露 health。
 # 暴露 env/metrics 等端点会泄漏配置（含密钥）——这是真实安全事故的高发点

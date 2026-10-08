@@ -53,6 +53,11 @@ public final class ErrorCodes {
      */
     public static final int DUPLICATE_SUBMIT = 3004;
 
+    /** 文件上传：文件为空（没选文件或前端没传 part） */
+    public static final int FILE_EMPTY = 4001;
+    /** 文件上传：类型不支持（只允许 jpg / png / webp） */
+    public static final int FILE_TYPE_INVALID = 4002;
+
     /** 系统内部错误（未捕获异常兜底，细节只进日志，绝不透出堆栈） */
     public static final int SYSTEM_ERROR = 5000;
 }
