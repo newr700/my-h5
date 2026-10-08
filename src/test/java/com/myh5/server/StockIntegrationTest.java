@@ -71,10 +71,15 @@ class StockIntegrationTest {
     }
 
     private JsonNode call(String json) throws Exception {
+        // V2 Step2：下单必须带幂等号 requestId。这里统一兜底——若调用方没传就自动补一个
+        // 随机 UUID（每次唯一），避免漏传时整组库存用例被 @NotBlank 校验拦成 1001。
+        String body = json.contains("requestId")
+                ? json
+                : json.replace("}", ",\"requestId\":\"" + java.util.UUID.randomUUID() + "\"}");
         MvcResult result = mockMvc.perform(post("/order/create")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json))
+                        .content(body))
                 .andExpect(status().isOk())
                 .andReturn();
         return om.readTree(result.getResponse().getContentAsString());

@@ -44,6 +44,15 @@ public final class ErrorCodes {
      */
     public static final int STOCK_NOT_ENOUGH = 3003;
 
+    /**
+     * V2：重复提交（并发幂等冲突）。
+     *
+     * 正常幂等（串行重复）走「预检命中直接返回」，不会走到这里；
+     * 只有两个相同 requestId 同时到达、都通过预检后又撞了唯一索引，才会回滚并抛这个码。
+     * 前端收到后用同一个 requestId 重试一次即可（重试会命中预检返回原订单）。
+     */
+    public static final int DUPLICATE_SUBMIT = 3004;
+
     /** 系统内部错误（未捕获异常兜底，细节只进日志，绝不透出堆栈） */
     public static final int SYSTEM_ERROR = 5000;
 }

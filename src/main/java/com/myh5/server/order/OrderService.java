@@ -45,40 +45,44 @@ public class OrderService {
 
     /**
      * 创建订单（PRD 5.2 写操作闭环的核心）。
-     * 流程：查比赛 → 【V2 扣库存】→ 后端算钱 → 生成订单号 → 落库。
+     * 流程：幂等预检 → 查比赛 → 【V2 扣库存】 → 后端算钱 → 落库。
      *
-     * @Transactional 在这里的意义（V2 后变得更关键了）：
-     * 现在这个方法里既有「UPDATE 库存」又有「INSERT 订单」，是两个独立的写操作。
-     * 没有事务时它们各自单独提交，一旦中间出错就会出现
-     * 「库存扣了但订单没建成」（用户没买到，票还少了）这种冤案。
-     * 有了事务，抛异常会让两步【一起回滚】—— 要么都成，要么都不成。
+     * ── V2 Step2：幂等（防重复下单）─────────────────────
+     * 这一版在「扣库存之前」先按 (userId, requestId) 查是否已存在订单：
+     *   · 命中 → 直接返回【原订单】，并且【不重复扣库存】。
+     *     覆盖「用户连点」「前端重试」「网络抖动重发」绝大多数重复场景。
+     *   · 未命中 → 正常走下单；唯一索引 (user_id, request_id) 作为并发兜底，
+     *     保证两个相同 requestId 绝不会建出两笔订单（撞索引时回滚并抛 3004 让前端重试）。
+     * requestId 由前端在「一笔下单意图」开始时生成并持久化（失败保留、成功清空），
+     * 见前端 api/order.ts 的 pendingRequestId 机制。这是「客户端生成幂等号 + 服务端唯一约束」
+     * 的经典组合，比服务端用 session 记订单更可靠（跨标签页 / 刷新后仍有效）。
+     *
+     * @Transactional 的意义（V2 后更关键）：方法里既有「UPDATE 库存」又有「INSERT 订单」，
+     * 没事务时任一环节出错会出现「库存扣了但订单没建成」（用户没买到，票还少了）。
+     * 有事务，抛异常两步一起回滚 —— 要么都成，要么都不成。
      */
     @Transactional
     public OrderVo create(CreateOrderRequest req) {
         Long userId = AuthContext.requireUserId();
+        String requestId = req.requestId();
+
+        // ── 幂等主路径：同一 requestId 已经下过单，直接返还原订单 ──────
+        // 注意返回原订单前【不要】扣库存 —— 否则「重复提交」会变成「重复扣票」，
+        // 那比不幂等还糟（用户没多买，库存却凭空少了）。
+        OrderEntity existing = orderMapper.selectByUserAndRequest(userId, requestId);
+        if (existing != null) {
+            return toVo(existing, matchInfoMapper.selectById(existing.getMatchId()));
+        }
 
         MatchInfoEntity match = matchInfoMapper.selectById(req.matchId());
         if (match == null || !"on_sale".equals(match.getStatus())) {
             throw new BizException(ErrorCodes.NOT_FOUND, "比赛不存在或已下架");
         }
 
-        // ── V2：先把票占下来 ──────────────────────────────
-        // 【为什么放在创建订单【之前】】
-        // 下单的本质是「抢稀缺资源」，先到先得。若先建订单再扣库存，
-        // 就会出现「订单插进去了才发现没票，再回滚」—— 白白写了一次数据，
-        // 高并发时这些无效写入会把数据库连接池和磁盘 IO 吃掉。
-        // 先扣还是后扣在功能上等价，但在争抢场景下「先占资源」更符合直觉也更省。
-        //
-        // 【返回 0 意味着什么】看一下 MatchInfoMapper.deductStock 的注释：
-        // 那条 UPDATE 带了 WHERE stock >= qty 的条件，由数据库在加锁的瞬间判断。
-        // 返回 0 = 条件没满足 = 票不够了。这是【并发安全】的判断，
-        // 与上面那个简单的 if (match == null) 完全不同 ——
-        // 后者只是把明显不合法的请求挡在外面，真正防超卖的是这一条。
+        // ── V2：先把票占下来（并发安全，见 deductStock 注释）────────
         int affected = matchInfoMapper.deductStock(match.getId(), req.quantity());
         if (affected == 0) {
             // 抛异常 → @Transactional 回滚 → 本次没扣到票也不会留下任何半成品记录。
-            // 错误话术要明确：用户点提交时看到的是「前台还有 3 张」这一秒的旧快照，
-            // 告诉他发生了什么比含糊的「下单失败」体验好得多
             throw new BizException(ErrorCodes.STOCK_NOT_ENOUGH,
                     "票不够了（可能刚被别人买走），请刷新后重试");
         }
@@ -92,21 +96,32 @@ public class OrderService {
         order.setUnitPrice(match.getUnitPrice());
         order.setTotalAmount(match.getUnitPrice() * req.quantity());
         order.setStatus("pending");
+        order.setRequestId(requestId); // V2 Step2：带上幂等号，唯一索引据此防重复
         order.setCreatedAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());
 
         try {
             orderMapper.insert(order);
         } catch (DuplicateKeyException e) {
-            // 订单号撞了唯一约束（时间戳+随机数极小概率重复）：重试一次。
-            // 为什么不循环重试到成功：连续撞两次说明生成器有 bug，该炸出来而不是硬扛
-            order.setOrderNo(generateOrderNo());
-            orderMapper.insert(order);
+            // 并发幂等：两个相同 requestId 同到，都预检无、都扣了库存；
+            // 一个 insert 成功，另一个撞 (user_id, request_id) 唯一索引。
+            // 这里必须让事务回滚 —— @Transactional 会因这个重抛的异常整体回滚，
+            // 否则「扣了库存却没建成订单」会凭空少票。
+            // 回滚后前端用同一 requestId 重试，会命中上面的预检返回原订单。
+            // （注：order_no 撞唯一约束这种极小概率事件也走同一路径，
+            //   前端用同一 requestId 重发时，若 requestId 不同则预检不命中会重新建单，同样收敛。）
+            throw new BizException(ErrorCodes.DUPLICATE_SUBMIT, "重复提交，请重试");
         }
 
-        return new OrderVo(order.getId(), order.getOrderNo(),
-                match.getHomeTeam() + " vs " + match.getAwayTeam(),
-                match.getMatchTime(), order.getQuantity(),
+        return toVo(order, match);
+    }
+
+    /** 实体 → VO（标题由比赛表拼出，比赛下架则降级文案） */
+    private OrderVo toVo(OrderEntity order, MatchInfoEntity match) {
+        String title = (match == null) ? "已下架的比赛"
+                : match.getHomeTeam() + " vs " + match.getAwayTeam();
+        return new OrderVo(order.getId(), order.getOrderNo(), title,
+                match == null ? null : match.getMatchTime(), order.getQuantity(),
                 order.getUnitPrice(), order.getTotalAmount(),
                 order.getStatus(), order.getCreatedAt());
     }

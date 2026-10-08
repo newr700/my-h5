@@ -1,6 +1,7 @@
 package com.myh5.server.order;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -30,6 +31,10 @@ public class OrderEntity {
 
     /** 业务订单号（MO+时间戳+随机数），对外暴露用它，不用自增 id */
     private String orderNo;
+
+    /** 幂等号（V2 Step2）：客户端生成的 requestId，配合 (user_id, request_id) 唯一索引防重复下单 */
+    @TableField("request_id")
+    private String requestId;
 
     private Long userId;
     private Long matchId;

@@ -134,10 +134,11 @@ class ApiFlowIntegrationTest {
     void 下单_金额由后端重算() throws Exception {
         // matchId=1 是种子数据里 29900 分的比赛，买 2 张 = 59800 分。
         // 如果后端信了前端传的金额，这个断言就会失败 —— 这条用例就是「后端重算」的哨兵
+        // V2 Step2：下单必须带幂等号 requestId（否则被 @NotBlank 校验拦下）
         MvcResult result = mockMvc.perform(post("/order/create")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"matchId\":1,\"quantity\":2}"))
+                        .content("{\"matchId\":1,\"quantity\":2,\"requestId\":\"flow-order-1\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode body = om.readTree(result.getResponse().getContentAsString());
@@ -151,10 +152,11 @@ class ApiFlowIntegrationTest {
     @Test
     @Order(8)
     void 下单参数不合法_返回1001() throws Exception {
+        // quantity=99 触发 @Max(10) 校验失败；requestId 已补，让失败源只剩 quantity
         MvcResult result = mockMvc.perform(post("/order/create")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"matchId\":1,\"quantity\":99}"))
+                        .content("{\"matchId\":1,\"quantity\":99,\"requestId\":\"flow-invalid-1\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
         assertEquals(1001, om.readTree(result.getResponse().getContentAsString()).get("code").asInt());
