@@ -23,6 +23,9 @@ export default defineConfig({
     }
   },
   server: {
+    // 固定开发端口为 5173（显式声明，避免被占用时 Vite 自动跳到 5174）
+    port: 5173,
+    strictPort: false,
     proxy: {
       // 开发时把 /api 代理到本地后端 —— 后端主力是 Java（my-h5-server，8080 端口）；
       // Node 版（my-h5-api，3000 端口）冻结保留作对照。
