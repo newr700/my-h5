@@ -252,7 +252,7 @@ function rankBadgeClass(team: TeamStanding) {
 .row {
   display: flex;
   align-items: center;
-  padding: 10px 0;
+  padding: 10px 12px;
   border-bottom: 1px solid #f2f6fc;
   font-size: 13px;
 }
@@ -260,6 +260,8 @@ function rankBadgeClass(team: TeamStanding) {
 .row--header {
   font-weight: bold;
   background: #f5f7fa;
+  /* 表头是列表最顶一行：只圆「左右上角」，与下方内容自然衔接 */
+  border-radius: 8px 8px 0 0;
 }
 
 /* 列宽：排名和球队占左边，四个数字列等宽对齐 */
@@ -317,7 +319,7 @@ function rankBadgeClass(team: TeamStanding) {
 
 /* 分区标签条 */
 .zone {
-  padding: 6px 0;
+  padding: 6px 12px;
   font-size: 12px;
   font-weight: bold;
   color: #ffffff;
@@ -395,7 +397,7 @@ function rankBadgeClass(team: TeamStanding) {
   }
 
   .zone {
-    padding: 8px 0;
+    padding: 8px 12px;
     font-size: 13px;
   }
 
