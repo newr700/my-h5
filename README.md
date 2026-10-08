@@ -85,8 +85,8 @@
 | `V1__init.sql` | 建表（user / match_info / match_order / team_standing 等） |
 | `V2__seed.sql` | 灌入 8 场比赛初始数据 |
 | `V3__stock.sql` | 给 `match_info` 加 `total_stock` / `stock` 库存字段（V2 Step1 防超卖） |
-| `V4__idempotency.sql` | 规划中：订单 `request_id` + 唯一索引（V2 Step2 幂等） |
-| `V5__audit.sql` | 规划中：审计日志表（V2 Step3 审计） |
+| `V4__idempotency.sql` | 订单 `request_id` + 唯一索引（V2 Step2 幂等，已完成） |
+| `V5__audit.sql` | 审计日志表 `audit_log`（V2 Step3 审计，已完成） |
 
 ## 错误码
 
@@ -113,11 +113,11 @@ V2 是把「能跑通」升级为「真实场景不出错」的阶段，拆成�
 |---|---|---|---|---|
 | Step 1 | 防超卖（并发抢票不超卖） | 已完成 | `V3__stock.sql` | `1e2ea8e` |
 | Step 2 | 幂等（同一请求只处理一次，防重复下单） | 已完成 | `V4__idempotency.sql` | `9a3f641` |
-| Step 3 | 审计日志（谁改了什么可追溯） | 未开始 | `V5__audit.sql` | — |
+| Step 3 | 审计日志（谁改了什么可追溯） | 已完成 | `V5__audit.sql` | `24206b7` |
 
 - **防超卖（已完成）**：`MatchInfoMapper.deductStock` 用「带条件的原子 UPDATE」（`WHERE stock >= qty`）靠行锁消除并发下的 TOCTOU；下单先扣库存，取消回补，支付不回补。`StockIntegrationTest` 6 项验证。
 - **幂等（已完成）**：`CreateOrderRequest` 携带必填 `requestId`（@NotBlank），订单表加 `(user_id, request_id)` 唯一索引；下单前按 `(userId, requestId)` 预检，命中返还原订单且不重复扣库存，撞索引回滚并抛 3004 让前端重试。前端 `api/order.ts` 用 `pendingRequestId`（成功清空、失败保留）配合。测试见 `IdempotencyIntegrationTest`（5 项）。
-- **审计（未开始）**：计划记录关键操作的 actor / action / 时间 / IP，便于追溯与排障。
+- **审计（已完成）**：新增 `audit_log` 表（V5 迁移）。`OrderService` 的 `create`/`pay`/`cancel` 三个写操作，在**成功路径**与**失败路径**（状态机守卫 3002 / 订单不存在 3001 / 库存不足 3003 / 并发幂等 3004）都记一笔审计，含 actor、action、状态迁移、错误码、关联幂等号。关键设计：`AuditLogService.record()` 用 `@Transactional(REQUIRES_NEW)` 独立提交，确保主业务即便回滚，失败尝试的审计也不丢失；审计表因此**不建外键**指向订单表。测试见 `AuditLogIntegrationTest`（6 项）。
 
 ## 测试
 
@@ -126,7 +126,7 @@ mvn clean test
 ```
 
 - 在 H2（MySQL 兼容模式）下跑**同一份** Flyway 迁移，保证测的是真实表结构、不依赖本机 MySQL。
-- 当前 **21/21 全绿**（ApiFlow 10 + JWT 4 + 冒烟 1 + 库存集成 6）。
+- 当前 **32/32 全绿**（ApiFlow 10 + JWT 4 + 冒烟 1 + 库存集成 6 + 幂等 5 + 审计 6）。
 - 用系统 PowerShell / Windows Terminal 跑（本机 AI 会话内置终端跑不了 mvn，已知环境问题）。
 - 切分支 / 回退后务必 `mvn clean`，否则 `target/classes` 残留旧迁移脚本会导致 Flyway 报「找到多个相同版本的迁移」。
 
@@ -176,7 +176,7 @@ java -jar target/my-h5-server-0.0.1-SNAPSHOT.jar
 
 ## 分支模型
 
-- `main`：当前主力分支，含 V2 Step1 防超卖。
+- `main`：当前主力分支，已完成 V2 正确性加固三步（防超卖 / 幂等 / 审计）。
 - `archive/v2-draft-1`：存档分支，保留过一次「V2 全量草稿（幂等 + 防超卖 + 审计）」及更早的未提交工作，仅作对照与退路，不再加功能。
 
 ## 仓库角色
