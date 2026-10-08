@@ -1,0 +1,164 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useUserStore } from '@/stores/user'
+import { uploadAvatar } from '@/api/user'
+// 模板里第 91 行要用 avatarSrc() 拼出可访问的头像地址。
+// 原先漏了这一行 import，模板会当成「未定义的变量」——编译期 TS 报错，
+// 运行时则是 avatarSrc is not defined，整个用户中心页直接白掉。
+import { avatarSrc } from '@/utils/avatar'
+
+/**
+ * 用户中心（PRD-F8）。
+ * 路由守卫保证进入本页时已有 token；这里负责把 token 换成真实资料。
+ * 头像上传（V6 新增）也在这里：选图 → 调 uploadAvatar → 刷新资料。
+ */
+const userStore = useUserStore()
+const router = useRouter()
+
+onMounted(() => {
+  // token 过期/被删时会触发 request.ts 的全局 401 处理（自动跳登录），
+  // 所以这里静默 catch 即可，不用重复处理跳转
+  userStore.loadProfile().catch(() => {})
+})
+
+// 头像占位文字：昵称/用户名首字符（有头像图后由图片替代）
+const avatarText = computed(() => {
+  const name = userStore.profile?.nickname || userStore.profile?.username || '?'
+  return name.charAt(0).toUpperCase()
+})
+
+// ── 头像上传（V6 新增）──────────────────────────────────
+// 没用 el-upload 自带 XHR：它会绕过我们封装的 axios（不带 token、不拆 {code,message,data} 外壳）。
+// 改用原生 <input type="file"> + 自封装 uploadAvatar，逻辑透明、教学友好。
+const fileInput = ref<HTMLInputElement | null>(null)
+const uploading = ref(false)
+
+function pickFile() {
+  fileInput.value?.click()
+}
+
+async function onFileChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  // 前端友好校验：类型 + 大小（后端也会校验，不能只信前端，这里只是提前拦一道）
+  const okType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+  const okSize = file.size / 1024 / 1024 < 2
+  if (!okType) {
+    ElMessage.error('仅支持 JPG / PNG / WebP 图片')
+    target.value = ''
+    return
+  }
+  if (!okSize) {
+    ElMessage.error('图片大小不能超过 2MB')
+    target.value = ''
+    return
+  }
+  uploading.value = true
+  try {
+    await uploadAvatar(file)
+    // 重新拉取资料，保证右上角与用户中心头像同步刷新
+    await userStore.loadProfile()
+    ElMessage.success('头像已更新')
+  } catch (err) {
+    ElMessage.error((err as Error).message || '上传失败')
+  } finally {
+    uploading.value = false
+    target.value = '' // 清空，允许重复选择同一文件再次触发 change
+  }
+}
+
+function onLogout() {
+  // 退出登录用二次确认：这是不可逆操作（清掉本地登录态），误触成本高，
+  // 用 ElMessageBox.confirm 拦一道，比直接登出更稳妥（技能点：危险操作二次确认）
+  ElMessageBox.confirm('确定要退出登录吗？', '提示', { type: 'warning' })
+    .then(() => {
+      userStore.logout()
+      // 登出后回登录页（replace 不留历史，按返回键不会回到要登录的页面）
+      router.replace('/login')
+    })
+    .catch(() => {
+      // 用户点「取消」也会进 catch，这是 ElMessageBox 取消的正常路径，不是错误
+    })
+}
+</script>
+
+<template>
+  <div class="page">
+    <!-- 资料加载成功：卡片 + 描述列表 + 操作 -->
+    <el-card v-if="userStore.profile" class="profile-card">
+      <template #header>
+        <div class="card-header">
+          <!-- 有头像显示图片，否则首字母占位 -->
+          <el-avatar :size="44" :src="avatarSrc(userStore.profile?.avatarUrl)" v-if="userStore.profile?.avatarUrl" />
+          <el-avatar :size="44" v-else>{{ avatarText }}</el-avatar>
+          <span class="header-title">用户中心</span>
+        </div>
+      </template>
+
+      <el-descriptions :column="1" border>
+        <el-descriptions-item label="昵称">{{ userStore.profile.nickname }}</el-descriptions-item>
+        <el-descriptions-item label="用户名">{{ userStore.profile.username }}</el-descriptions-item>
+        <el-descriptions-item label="ID">{{ userStore.profile.id }}</el-descriptions-item>
+        <el-descriptions-item label="注册时间">{{ userStore.profile.createdAt }}</el-descriptions-item>
+      </el-descriptions>
+
+      <div class="actions">
+        <el-button type="primary" :loading="uploading" @click="pickFile">更换头像</el-button>
+        <!-- 隐藏的 file input：被「更换头像」按钮触发；change 时读文件并上传 -->
+        <input
+          ref="fileInput"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          hidden
+          @change="onFileChange"
+        />
+        <el-button type="primary" @click="router.push('/order')">去看看我的订单</el-button>
+        <el-button @click="onLogout">退出登录</el-button>
+      </div>
+    </el-card>
+
+    <!-- 加载中：骨架屏 -->
+    <el-card v-else-if="userStore.loading" class="state-card">
+      <el-skeleton :rows="4" animated />
+    </el-card>
+
+    <!-- 加载失败：错误态 + 重试入口（清单：错误必须可感知） -->
+    <el-card v-else class="state-card">
+      <el-result icon="error" title="资料加载失败">
+        <template #extra>
+          <el-button type="primary" @click="userStore.loadProfile">重试</el-button>
+        </template>
+      </el-result>
+    </el-card>
+  </div>
+</template>
+
+<style scoped>
+.page {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding: 16px;
+}
+.profile-card,
+.state-card {
+  max-width: 600px;
+  margin: 0 auto;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.header-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
+}
+</style>

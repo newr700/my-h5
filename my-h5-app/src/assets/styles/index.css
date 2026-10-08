@@ -1,0 +1,22 @@
+/* 全局样式：CSS 变量、reset —— 全项目唯一的样式入口 */
+
+:root {
+  --app-primary: #1989fa;
+  --app-bg: #f7f8fa;
+  --app-text: #323233;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+  color: var(--app-text);
+  background: var(--app-bg);
+  -webkit-font-smoothing: antialiased;
+}
