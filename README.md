@@ -1,6 +1,6 @@
 # my-h5-app
 
-双人协作的移动端 H5 项目。前端基于 Vue 3 + Vite + TypeScript，后端为独立仓库（另行搭建）。
+双人协作的 Web 项目，定位为 **PC 浏览为主、兼顾手机**。前端基于 Vue 3 + Vite + TypeScript，后端为独立仓库 `my-h5-server`（Java）。
 
 ## 快速开始
 
@@ -11,33 +11,56 @@ npm run build      # 类型检查 + 生产打包
 npm run preview    # 本地预览打包产物
 ```
 
-要求 Node ≥ 20。开发时接口通过 Vite 代理转发到本地后端（默认 `http://localhost:3000`，见 `vite.config.ts`）。
+要求 Node ≥ 20。开发时接口通过 Vite 代理转发到本地后端（默认 `http://localhost:8080`，见 `vite.config.ts`）。
 
 ## 技术栈
 
 | 用途 | 选型 |
 | --- | --- |
 | 框架 | Vue 3 + Vite + TypeScript |
-| UI 组件库 | Vant（移动端） |
+| UI 组件库 | **Element Plus 2.14.7（桌面组件库，PC 为主）** |
 | 状态管理 | Pinia |
-| 路由 | Vue Router（hash 模式，按模块拆分） |
+| 路由 | Vue Router（**history 模式**，按模块拆分） |
 | 请求 | Axios（统一封装于 `src/api/request.ts`） |
-| 移动端适配 | postcss-px-to-viewport（按 375 设计稿写 px，自动转 vw） |
+| 响应式 | 自有 `responsive.css`（媒体查询，768px 断点；PC 铺满全屏，手机内边距收窄） |
 | 代码规范 | ESLint + Prettier |
+
+> 演进说明：早期按「移动端为主」用 Vant + postcss-px-to-viewport（px 转 vw）；2026-10-05 起改为 PC 为主，切换 Element Plus、移除 px-to-viewport，详见各文件顶部注释。
+
+## 双端策略（PC 为主、兼顾手机）
+
+- **桌面铺满全屏**：`responsive.css` 让导航栏与内容在任意宽度下都铺满视口，不再限宽居中。
+- **内容区内边距**：默认 24px，`< 768px` 手机收窄到 12px，防贴边。
+- 只用一个断点是刻意取舍：主战场在 PC，手机是附加形态，每多一个断点布局分支是乘法关系。
+
+## 顶部导航栏
+
+`src/App.vue` 内置 Element Plus 横向 `el-menu`，做成「常规 Web 导航栏」：
+
+- 左侧：品牌名 `my-h5-app`
+- 中间：我的 / 购票 / 积分榜（router 模式，当前页自动高亮）
+- 右侧：登录态 —— 已登录显示头像 + 用户名下拉（可退出），未登录显示「未登录」按钮
+- 登录页 `meta.nav === false` 时不显示导航栏（做全屏登录页）
+
+## 路由与登录守卫
+
+- 使用 **history 模式**（URL 干净无 `#`），代价是部署必须配 SPA fallback：本项目已在根目录 `vercel.json` 用 `rewrites` 兜底任意子路径刷新 / 直链；换 Nginx 加 `try_files $uri $uri/ /index.html;` 同理。
+- `router.beforeEach` 做前端登录拦截（体验层）：未登录访问受保护页跳 `/login` 并带 `?redirect=`；真正的防线在 Java 端 `AuthInterceptor`，前端锁防君子、后端锁防所有人。
 
 ## 目录结构
 
 ```
 src/
 ├── api/           # 所有后端请求，按模块分文件（request.ts 为统一封装）
-├── assets/        # 全局样式、图片、字体
+├── assets/        # 全局样式（index.css 基础 / responsive.css 响应式）、图片、字体
 ├── components/    # 全局通用组件（≥2 个模块使用才放这里）
 ├── composables/   # 全局组合式函数（useXxx）
 ├── router/        # 路由总表 + modules/ 按模块拆分
 ├── stores/        # Pinia 状态，按模块分文件
 ├── types/         # TS 类型，与后端接口字段对齐
 ├── utils/         # 纯工具函数
-└── views/         # 页面，按业务模块分目录（user/ order/ …）
+├── views/         # 页面，按业务模块分目录（user/ order/ standings/ …）
+└── App.vue        # 全局外壳：顶部导航栏 + 内容区
 ```
 
 判断新文件放哪：**被 ≥2 个模块使用 → 共享区；只属于一个页面 → 就近放模块里。**
@@ -82,6 +105,12 @@ src/
 2. **不许**改别人的模块目录 —— `user/` 是 A 的，`order/` 是 B 的，各扫门前雪。
 3. **不许**把密钥、密码写进任何代码文件 —— 只能放 `.env.local`（这个文件 git 不会提交）。
 
+## 与后端联调
+
+- 本地后端主力是 **Java（my-h5-server，8080）**；Node 版 `my-h5-api`（3000）冻结保留作对照。
+- `vite.config.ts` 的 `server.proxy` 把 `/api` 转发到 `http://localhost:8080` 并去掉前缀（后端不配 context-path，前缀是代理层职责）。
+- 生产环境跨域走后端 CORS，或前后端同域部署。
+
 ## 协作
 
 分支模型、commit 规范、责任分区、依赖方向红线，全部见 [CONTRIBUTING.md](./CONTRIBUTING.md)。开工前必读。
@@ -91,5 +120,5 @@ src/
 ```bash
 npm run lint         # ESLint 检查
 npm run format       # Prettier 一键格式化
-npm run type-check   # TS 类型检查
+npm run type-check   # TS 类型检查（vue-tsc --noEmit）
 ```
