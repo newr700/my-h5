@@ -37,10 +37,12 @@ public class OrderService {
 
     private final OrderMapper orderMapper;
     private final MatchInfoMapper matchInfoMapper;
+    private final AuditLogService auditLogService;
 
-    public OrderService(OrderMapper orderMapper, MatchInfoMapper matchInfoMapper) {
+    public OrderService(OrderMapper orderMapper, MatchInfoMapper matchInfoMapper, AuditLogService auditLogService) {
         this.orderMapper = orderMapper;
         this.matchInfoMapper = matchInfoMapper;
+        this.auditLogService = auditLogService;
     }
 
     /**
@@ -57,6 +59,13 @@ public class OrderService {
      * 见前端 api/order.ts 的 pendingRequestId 机制。这是「客户端生成幂等号 + 服务端唯一约束」
      * 的经典组合，比服务端用 session 记订单更可靠（跨标签页 / 刷新后仍有效）。
      *
+     * ── V2 Step3：审计（关键操作留痕）─────────────────────
+     * 下单的【成功】与【失败】两条路径都记一笔审计：
+     *   · 成功（含幂等命中返回原单）→ result=1，记 status=pending、request_id；
+     *   · 失败（比赛下架 1002 / 库存不足 3003 / 并发冲突 3004）→ result=0，记 error_code。
+     * 审计用 REQUIRES_NEW 独立提交，所以即使本方法因异常整体回滚，
+     * 「这次失败的下单尝试」依然会留在 audit_log（详见 AuditLogService 类注释）。
+     *
      * @Transactional 的意义（V2 后更关键）：方法里既有「UPDATE 库存」又有「INSERT 订单」，
      * 没事务时任一环节出错会出现「库存扣了但订单没建成」（用户没买到，票还少了）。
      * 有事务，抛异常两步一起回滚 —— 要么都成，要么都不成。
@@ -71,49 +80,64 @@ public class OrderService {
         // 那比不幂等还糟（用户没多买，库存却凭空少了）。
         OrderEntity existing = orderMapper.selectByUserAndRequest(userId, requestId);
         if (existing != null) {
+            // 幂等命中也是一次「成功的下单结果」，照常留痕（便于串联排查）
+            auditLogService.record(userId, "CREATE_ORDER", existing.getId(), null, "pending",
+                    true, null, requestId, "幂等命中，返回原订单");
             return toVo(existing, matchInfoMapper.selectById(existing.getMatchId()));
         }
 
-        MatchInfoEntity match = matchInfoMapper.selectById(req.matchId());
-        if (match == null || !"on_sale".equals(match.getStatus())) {
-            throw new BizException(ErrorCodes.NOT_FOUND, "比赛不存在或已下架");
-        }
-
-        // ── V2：先把票占下来（并发安全，见 deductStock 注释）────────
-        int affected = matchInfoMapper.deductStock(match.getId(), req.quantity());
-        if (affected == 0) {
-            // 抛异常 → @Transactional 回滚 → 本次没扣到票也不会留下任何半成品记录。
-            throw new BizException(ErrorCodes.STOCK_NOT_ENOUGH,
-                    "票不够了（可能刚被别人买走），请刷新后重试");
-        }
-
-        OrderEntity order = new OrderEntity();
-        order.setOrderNo(generateOrderNo());
-        order.setUserId(userId);
-        order.setMatchId(match.getId());
-        order.setQuantity(req.quantity());
-        // 快照单价：以库里的价格为准，与前端展示无关 —— 哪怕前端页面显示错了，账也是对的
-        order.setUnitPrice(match.getUnitPrice());
-        order.setTotalAmount(match.getUnitPrice() * req.quantity());
-        order.setStatus("pending");
-        order.setRequestId(requestId); // V2 Step2：带上幂等号，唯一索引据此防重复
-        order.setCreatedAt(LocalDateTime.now());
-        order.setUpdatedAt(LocalDateTime.now());
-
         try {
+            MatchInfoEntity match = matchInfoMapper.selectById(req.matchId());
+            if (match == null || !"on_sale".equals(match.getStatus())) {
+                throw new BizException(ErrorCodes.NOT_FOUND, "比赛不存在或已下架");
+            }
+
+            // ── V2：先把票占下来（并发安全，见 deductStock 注释）────────
+            int affected = matchInfoMapper.deductStock(match.getId(), req.quantity());
+            if (affected == 0) {
+                // 抛异常 → @Transactional 回滚 → 本次没扣到票也不会留下任何半成品记录。
+                throw new BizException(ErrorCodes.STOCK_NOT_ENOUGH,
+                        "票不够了（可能刚被别人买走），请刷新后重试");
+            }
+
+            OrderEntity order = new OrderEntity();
+            order.setOrderNo(generateOrderNo());
+            order.setUserId(userId);
+            order.setMatchId(match.getId());
+            order.setQuantity(req.quantity());
+            // 快照单价：以库里的价格为准，与前端展示无关 —— 哪怕前端页面显示错了，账也是对的
+            order.setUnitPrice(match.getUnitPrice());
+            order.setTotalAmount(match.getUnitPrice() * req.quantity());
+            order.setStatus("pending");
+            order.setRequestId(requestId); // V2 Step2：带上幂等号，唯一索引据此防重复
+            order.setCreatedAt(LocalDateTime.now());
+            order.setUpdatedAt(LocalDateTime.now());
+
             orderMapper.insert(order);
+
+            // 成功留痕：动作 / 对象 / 状态迁移 / 幂等号 全部落到审计表（独立事务提交）
+            auditLogService.record(userId, "CREATE_ORDER", order.getId(), null, "pending",
+                    true, null, requestId, "quantity=" + req.quantity());
+            return toVo(order, match);
+
         } catch (DuplicateKeyException e) {
             // 并发幂等：两个相同 requestId 同到，都预检无、都扣了库存；
             // 一个 insert 成功，另一个撞 (user_id, request_id) 唯一索引。
             // 这里必须让事务回滚 —— @Transactional 会因这个重抛的异常整体回滚，
             // 否则「扣了库存却没建成订单」会凭空少票。
             // 回滚后前端用同一 requestId 重试，会命中上面的预检返回原订单。
-            // （注：order_no 撞唯一约束这种极小概率事件也走同一路径，
-            //   前端用同一 requestId 重发时，若 requestId 不同则预检不命中会重新建单，同样收敛。）
+            // 用 REQUIRES_NEW 的审计把「这次失败」也记下来，再原样抛出。
+            auditLogService.record(userId, "CREATE_ORDER", null, null, null,
+                    false, ErrorCodes.DUPLICATE_SUBMIT, requestId, "并发唯一索引冲突");
             throw new BizException(ErrorCodes.DUPLICATE_SUBMIT, "重复提交，请重试");
-        }
 
-        return toVo(order, match);
+        } catch (BizException e) {
+            // 业务规则不满足（比赛下架 / 库存不足等）：记下失败尝试，再原样抛出，
+            // 让外层 @Transactional 回滚；审计记录因 REQUIRES_NEW 已独立提交，不会跟着消失。
+            auditLogService.record(userId, "CREATE_ORDER", null, null, null,
+                    false, e.getCode(), requestId, e.getMessage());
+            throw e;
+        }
     }
 
     /** 实体 → VO（标题由比赛表拼出，比赛下架则降级文案） */
@@ -148,40 +172,67 @@ public class OrderService {
         return new PageResult<>(vos, page.getTotal(), page.getCurrent(), page.getSize());
     }
 
-    /** 支付（mock：不做真实扣款，只推状态机。接真实支付见 PRD 第 7 章「不做什么」） */
+    /**
+     * 支付（mock：不做真实扣款，只推状态机。接真实支付见 PRD 第 7 章「不做什么」）
+     *
+     * ── V2 Step3：审计 ── 支付成功记 (pending→paid)；失败（状态机守卫 3002 / 订单不存在 3001）
+     * 也记一条 result=0 的审计，便于排查「为什么某笔订单没付成」。
+     */
     @Transactional
     public void pay(long orderId) {
-        OrderEntity order = loadOwnOrder(orderId);
-        if (!"pending".equals(order.getStatus())) {
-            throw new BizException(ErrorCodes.ORDER_STATE_INVALID,
-                    "订单当前状态不允许支付（状态：" + order.getStatus() + "）");
+        Long userId = AuthContext.requireUserId();
+        try {
+            OrderEntity order = loadOwnOrder(orderId);
+            String before = order.getStatus();
+            if (!"pending".equals(before)) {
+                throw new BizException(ErrorCodes.ORDER_STATE_INVALID,
+                        "订单当前状态不允许支付（状态：" + before + "）");
+            }
+            order.setStatus("paid");
+            order.setUpdatedAt(LocalDateTime.now());
+            orderMapper.updateById(order);
+            auditLogService.record(userId, "PAY", orderId, before, "paid", true, null, null, null);
+        } catch (BizException e) {
+            auditLogService.record(userId, "PAY", orderId, null, null, false, e.getCode(), null, e.getMessage());
+            throw e;
         }
-        order.setStatus("paid");
-        order.setUpdatedAt(LocalDateTime.now());
-        orderMapper.updateById(order);
     }
 
-    /** 取消：pending → closed；paid 不能取消（退票是另一个业务流程，PRD 明确不做） */
+    /**
+     * 取消：pending → closed；paid 不能取消（退票是另一个业务流程，PRD 明确不做）
+     *
+     * ── V2 Step3：审计 ── 取消成功记 (pending→closed)；失败（状态机守卫 3002 / 订单不存在 3001）
+     * 也记一条 result=0 的审计。
+     */
     @Transactional
     public void cancel(long orderId) {
-        OrderEntity order = loadOwnOrder(orderId);
-        if (!"pending".equals(order.getStatus())) {
-            throw new BizException(ErrorCodes.ORDER_STATE_INVALID,
-                    "订单当前状态不允许取消（状态：" + order.getStatus() + "）");
+        Long userId = AuthContext.requireUserId();
+        try {
+            OrderEntity order = loadOwnOrder(orderId);
+            String before = order.getStatus();
+            if (!"pending".equals(before)) {
+                throw new BizException(ErrorCodes.ORDER_STATE_INVALID,
+                        "订单当前状态不允许取消（状态：" + before + "）");
+            }
+            // 【V2】这一步很重要：把票还给票池。
+            // 只在「下单时扣、成功后不管」是不行的 —— 用户反复下单取消几次，
+            // 票池就被这些「没成交的占位」耗光了，票一张没卖出去却谁也买不了。
+            // 这在概念上和「内存泄漏」是一回事：借了没还。
+            //
+            // 【为什么只有 cancel 回补，pay 不回补】
+            // 支付成功意味着票真的卖出去了，库存占用应该【固化】下来；
+            // 只有「交易没走成」（取消/超时关闭）才需要把资源还回去。
+            // 这也是为什么 V3 迁移脚本回填库存时只统计 status='paid' 的订单。
+            order.setStatus("closed");
+            order.setUpdatedAt(LocalDateTime.now());
+            orderMapper.updateById(order);
+            matchInfoMapper.restoreStock(order.getMatchId(), order.getQuantity());
+            auditLogService.record(userId, "CANCEL", orderId, before, "closed",
+                    true, null, null, "quantity=" + order.getQuantity());
+        } catch (BizException e) {
+            auditLogService.record(userId, "CANCEL", orderId, null, null, false, e.getCode(), null, e.getMessage());
+            throw e;
         }
-        // 【V2】这一步很重要：把票还给票池。
-        // 只在「下单时扣、成功后不管」是不行的 —— 用户反复下单取消几次，
-        // 票池就被这些「没成交的占位」耗光了，票一张没卖出去却谁也买不了。
-        // 这在概念上和「内存泄漏」是一回事：借了没还。
-        //
-        // 【为什么只有 cancel 回补，pay 不回补】
-        // 支付成功意味着票真的卖出去了，库存占用应该【固化】下来；
-        // 只有「交易没走成」（取消/超时关闭）才需要把资源还回去。
-        // 这也是为什么 V3 迁移脚本回填库存时只统计 status='paid' 的订单。
-        order.setStatus("closed");
-        order.setUpdatedAt(LocalDateTime.now());
-        orderMapper.updateById(order);
-        matchInfoMapper.restoreStock(order.getMatchId(), order.getQuantity());
     }
 
     /**
