@@ -33,6 +33,13 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
+      },
+      // 头像等静态资源：开发时同样代理到后端 8080。
+      // 后端 WebMvcConfig 把本地上传目录映射为 /uploads/** 对外访问，
+      // 前端写相对路径 /uploads/xxx.png，由这里转发到 8080 取文件。
+      '/uploads': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
       }
     }
   }

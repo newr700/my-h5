@@ -28,6 +28,8 @@ export interface UserProfile {
   nickname: string
   /** "yyyy-MM-dd HH:mm:ss" 字符串（工程手册 4.3：时间一律字符串，东八区） */
   createdAt: string
+  /** 头像相对路径（如 /uploads/12_xxx.png）；空串表示未设置，前端显示首字母占位 */
+  avatarUrl?: string
 }
 
 /** 登录/注册成功的响应（对应 auth/vo/LoginVo.java） */

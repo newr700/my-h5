@@ -25,7 +25,9 @@
     <div class="nav-right">
       <el-dropdown v-if="userStore.isLoggedIn" @command="onCommand">
         <span class="user-trigger">
-          <el-avatar :size="28">{{ avatarText }}</el-avatar>
+          <!-- 有头像就显示图片；没有就显示首字母占位（V6 头像上传后才有 avatarUrl） -->
+          <el-avatar :size="28" :src="avatarImgSrc" v-if="avatarImgSrc" />
+          <el-avatar :size="28" v-else>{{ avatarText }}</el-avatar>
           <span class="uname">{{ displayName }}</span>
           <el-icon><ArrowDown /></el-icon>
         </span>
@@ -50,6 +52,7 @@ import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { avatarSrc } from '@/utils/avatar'
 
 const route = useRoute()
 const router = useRouter()
@@ -58,11 +61,14 @@ const userStore = useUserStore()
 // 登录页 meta.nav===false 不显示导航栏
 const showNav = computed(() => route.meta.nav !== false)
 
-// 用户名首字符作为头像占位（后端将来补 avatar 字段后换成图片更专业）
+// 用户名首字符作为头像占位（后端有 avatar 字段后换成图片更专业）
 const displayName = computed(
   () => userStore.profile?.nickname || userStore.profile?.username || '已登录'
 )
 const avatarText = computed(() => (displayName.value || '?').charAt(0).toUpperCase())
+// 头像是相对路径（如 /uploads/12_xxx.png），按部署环境拼成可访问地址；
+// 没有头像时返回 ''，模板用 v-if 切回首字母占位
+const avatarImgSrc = computed(() => avatarSrc(userStore.profile?.avatarUrl))
 
 // 应用启动 / 刷新页面后：若本地有 token 则拉资料恢复登录态，
 // 否则刷新后 store 重建、profile 为 null，右上角又会显示「未登录」

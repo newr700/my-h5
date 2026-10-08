@@ -44,6 +44,8 @@ export async function fetchUserProfile(): Promise<UserProfile> {
     id: asNumber(raw.id, 'profile.id'),
     username: asString(raw.username, 'profile.username'),
     nickname: asString(raw.nickname, 'profile.nickname'),
-    createdAt: asString(raw.createdAt, 'profile.createdAt')
+    createdAt: asString(raw.createdAt, 'profile.createdAt'),
+    // 头像属于「展示类次要字段」：缺失/类型错时用兜底值 ''，不阻断资料加载
+    avatarUrl: asString(raw.avatarUrl, 'profile.avatarUrl', '')
   }
 }

@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { uploadAvatar } from '@/api/user'
 
 /**
  * 用户中心（PRD-F8）。
  * 路由守卫保证进入本页时已有 token；这里负责把 token 换成真实资料。
+ * 头像上传（V6 新增）也在这里：选图 → 调 uploadAvatar → 刷新资料。
  */
 const userStore = useUserStore()
 const router = useRouter()
@@ -17,11 +19,52 @@ onMounted(() => {
   userStore.loadProfile().catch(() => {})
 })
 
-// 头像占位文字：昵称/用户名首字符（后端补 avatar 字段后可换图）
+// 头像占位文字：昵称/用户名首字符（有头像图后由图片替代）
 const avatarText = computed(() => {
   const name = userStore.profile?.nickname || userStore.profile?.username || '?'
   return name.charAt(0).toUpperCase()
 })
+
+// ── 头像上传（V6 新增）──────────────────────────────────
+// 没用 el-upload 自带 XHR：它会绕过我们封装的 axios（不带 token、不拆 {code,message,data} 外壳）。
+// 改用原生 <input type="file"> + 自封装 uploadAvatar，逻辑透明、教学友好。
+const fileInput = ref<HTMLInputElement | null>(null)
+const uploading = ref(false)
+
+function pickFile() {
+  fileInput.value?.click()
+}
+
+async function onFileChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  // 前端友好校验：类型 + 大小（后端也会校验，不能只信前端，这里只是提前拦一道）
+  const okType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+  const okSize = file.size / 1024 / 1024 < 2
+  if (!okType) {
+    ElMessage.error('仅支持 JPG / PNG / WebP 图片')
+    target.value = ''
+    return
+  }
+  if (!okSize) {
+    ElMessage.error('图片大小不能超过 2MB')
+    target.value = ''
+    return
+  }
+  uploading.value = true
+  try {
+    await uploadAvatar(file)
+    // 重新拉取资料，保证右上角与用户中心头像同步刷新
+    await userStore.loadProfile()
+    ElMessage.success('头像已更新')
+  } catch (err) {
+    ElMessage.error((err as Error).message || '上传失败')
+  } finally {
+    uploading.value = false
+    target.value = '' // 清空，允许重复选择同一文件再次触发 change
+  }
+}
 
 function onLogout() {
   // 退出登录用二次确认：这是不可逆操作（清掉本地登录态），误触成本高，
@@ -44,7 +87,9 @@ function onLogout() {
     <el-card v-if="userStore.profile" class="profile-card">
       <template #header>
         <div class="card-header">
-          <el-avatar :size="44">{{ avatarText }}</el-avatar>
+          <!-- 有头像显示图片，否则首字母占位 -->
+          <el-avatar :size="44" :src="avatarSrc(userStore.profile?.avatarUrl)" v-if="userStore.profile?.avatarUrl" />
+          <el-avatar :size="44" v-else>{{ avatarText }}</el-avatar>
           <span class="header-title">用户中心</span>
         </div>
       </template>
@@ -57,6 +102,15 @@ function onLogout() {
       </el-descriptions>
 
       <div class="actions">
+        <el-button type="primary" :loading="uploading" @click="pickFile">更换头像</el-button>
+        <!-- 隐藏的 file input：被「更换头像」按钮触发；change 时读文件并上传 -->
+        <input
+          ref="fileInput"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          hidden
+          @change="onFileChange"
+        />
         <el-button type="primary" @click="router.push('/order')">去看看我的订单</el-button>
         <el-button @click="onLogout">退出登录</el-button>
       </div>
