@@ -143,6 +143,7 @@ public class AnalysisService {
                 a.getId(),
                 a.getExpertNameEn(),
                 a.getExpertNameCn(),
+                a.getExpertTitle() == null ? "" : a.getExpertTitle(),
                 a.getTeamName(),
                 team == null ? "" : team.getTeamNameEn(),
                 team == null ? "TBD" : team.getShortName(),
