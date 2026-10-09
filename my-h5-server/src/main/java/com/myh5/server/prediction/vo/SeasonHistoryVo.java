@@ -8,6 +8,7 @@ package com.myh5.server.prediction.vo;
  * - seasonLabel（2024-25）是人看球时习惯的说法。
  * 换算关系（起始年份 + 1 拼出 「2024-25」）在 Service 里做一次，
  * 而不是让前端拿到 2024 自己拼 —— 展示格式属于契约，应该和后端一起改。
+ * - fourth（殿军）V12 起提供，文档给的是前四名。
  */
 public record SeasonHistoryVo(
         int edition,
@@ -15,6 +16,7 @@ public record SeasonHistoryVo(
         String seasonLabel,
         TeamBriefVo champion,
         TeamBriefVo runnerUp,
-        TeamBriefVo third
+        TeamBriefVo third,
+        TeamBriefVo fourth
 ) {
 }
