@@ -239,6 +239,7 @@ export interface SeasonHistory {
   champion: TeamBrief
   runnerUp: TeamBrief
   third: TeamBrief
+  fourth: TeamBrief
 }
 
 /** 夺冠次数榜一项（对应 vo/TitleCountVo.java） */
