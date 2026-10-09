@@ -1,4 +1,4 @@
-package com.myh5.server.prediction.vo;
+package com.myh5.server.analysis.vo;
 
 /**
  * 权威解析条目（VO）—— 与前端 types/api.ts 的 ExpertAnalysis 一一对应。

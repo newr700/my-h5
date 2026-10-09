@@ -1,4 +1,4 @@
-package com.myh5.server.prediction;
+package com.myh5.server.common;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;

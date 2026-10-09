@@ -1,4 +1,5 @@
-package com.myh5.server.prediction.vo;
+package com.myh5.server.history.vo;
+import com.myh5.server.common.vo.TeamBriefVo;
 
 /**
  * 历届战绩一行（VO）—— 页面5 上方表格。

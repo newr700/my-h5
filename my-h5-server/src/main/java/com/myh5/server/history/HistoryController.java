@@ -1,8 +1,8 @@
-package com.myh5.server.prediction;
+package com.myh5.server.history;
 
 import com.myh5.server.common.Result;
-import com.myh5.server.prediction.vo.SeasonHistoryVo;
-import com.myh5.server.prediction.vo.TitleCountVo;
+import com.myh5.server.history.vo.SeasonHistoryVo;
+import com.myh5.server.history.vo.TitleCountVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;

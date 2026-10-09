@@ -1,13 +1,15 @@
-package com.myh5.server.prediction;
+package com.myh5.server.history;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.myh5.server.prediction.vo.SeasonHistoryVo;
-import com.myh5.server.prediction.vo.TeamBriefVo;
-import com.myh5.server.prediction.vo.TitleCountVo;
+import com.myh5.server.history.vo.SeasonHistoryVo;
+import com.myh5.server.common.vo.TeamBriefVo;
+import com.myh5.server.history.vo.TitleCountVo;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import com.myh5.server.common.FootballTeamEntity;
+import com.myh5.server.common.TeamDictionary;
 
 /**
  * 历史回顾服务（页面5）。

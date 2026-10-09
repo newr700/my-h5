@@ -1,9 +1,9 @@
-package com.myh5.server.prediction;
+package com.myh5.server.analysis;
 
 import com.myh5.server.common.Result;
-import com.myh5.server.prediction.dto.CreateCommentRequest;
-import com.myh5.server.prediction.vo.ExpertAnalysisVo;
-import com.myh5.server.prediction.vo.ExpertCommentVo;
+import com.myh5.server.analysis.dto.CreateCommentRequest;
+import com.myh5.server.analysis.vo.ExpertAnalysisVo;
+import com.myh5.server.analysis.vo.ExpertCommentVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
