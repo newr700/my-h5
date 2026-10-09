@@ -115,7 +115,6 @@ function onLogout() {
           hidden
           @change="onFileChange"
         />
-        <el-button type="primary" @click="router.push('/order')">去看看我的订单</el-button>
         <el-button @click="onLogout">退出登录</el-button>
       </div>
     </el-card>

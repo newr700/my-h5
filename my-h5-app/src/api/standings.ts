@@ -57,7 +57,7 @@ export async function fetchStandings(): Promise<TeamStanding[]> {
 }
 
 /**
- * ── 想练习的话，对照写一下 user 和 order ─────────────────────
+ * ── 想练习的话，对照写一下 user ─────────────────────
  *
  * // user.ts：对象类型（不是数组），记得先判断是否对象
  * export async function fetchUserProfile(): Promise<UserProfile> {
@@ -71,19 +71,4 @@ export async function fetchStandings(): Promise<TeamStanding[]> {
  *   }
  * }
  *
- * // order.ts：带 enum 字段的列表，后端多返回一种状态也拦得住
- * export async function fetchOrderList(): Promise<OrderItem[]> {
- *   const raw = await get<unknown>('/order/list')
- *   const list = asArray(raw, 'orderList')
- *   expectCount(list, 'orderList', { max: 100 })   // 至多 100 条，防止后端忘了分页
- *   return list.map((item, i) => {
- *     if (!isPlainObject(item)) throw new Error(`[契约校验] orderList[${i}] 应该是对象`)
- *     return {
- *       id: asNumber(item.id, `orderList[${i}].id`),
- *       title: asString(item.title, `orderList[${i}].title`),
- *       amount: asNumber(item.amount, `orderList[${i}].amount`),
- *       status: asEnum(item.status, ['pending', 'paid', 'closed'], `orderList[${i}].status`)
- *     }
- *   })
- * }
  */
