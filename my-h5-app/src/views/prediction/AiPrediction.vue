@@ -81,7 +81,7 @@ function retry() {
     <div class="page-head">
       <div>
         <h2 class="title">这个算法分析英超</h2>
-        <p class="subtitle">六个维度加权，算出每支球队的夺冠概率</p>
+        <p class="subtitle">AI 模型评估每支球队的五个维度，并直接给出夺冠概率</p>
       </div>
       <!-- 数值开关：看图时数字会干扰整体形状，核对时又不能没有 -->
       <el-switch v-model="showValue" active-text="显示数值" inline-prompt />
@@ -186,46 +186,26 @@ function retry() {
             </template>
             <span v-else class="no-star">暂无球星资料</span>
           </div>
+
+          <!-- 底部：AI 分析文字（文档给定；空串则不显示） -->
+          <div v-if="t.analysis" class="ti-analysis">{{ t.analysis }}</div>
         </div>
       </div>
 
-      <!-- ── 算法说明（草图底部「算法说明与权重」）────────────── -->
-      <h3 class="sec-title">算法说明</h3>
-      <el-card shadow="never" class="algo">
-        <p class="algo-desc">
-          每支球队的六个维度各给 0~100 分，按下列权重加权求和后换算成夺冠概率：
-        </p>
-        <div class="algo-formula">夺冠概率 = round( ( Σ(维度分 × 权重) + 50 ) / 100 )</div>
-        <div class="algo-weights">
-          <div v-for="w in predictionStore.weights" :key="w.key" class="weight-chip">
-            <span class="w-label">{{ w.label }}</span>
-            <span class="w-value">{{ w.score }}</span>
+      <!-- ── 数据说明（原「算法说明与权重」，已改为说明数据来源）────────────── -->
+        <h3 class="sec-title">数据说明</h3>
+        <el-card shadow="never" class="algo">
+          <p class="algo-desc">
+            本页数据来自已训练的 AI 模型：对每支球队从下列 5 个维度评估打分（0~100），并直接输出夺冠概率。
+            维度评分越高表示该队该项越强；其中「伤病风险」例外，评分越高表示伤病风险越大。
+            夺冠概率由模型综合给出，并非各维度简单加权。
+          </p>
+          <div class="algo-weights">
+            <div v-for="w in predictionStore.weights" :key="w.key" class="weight-chip">
+              <span class="w-label">{{ w.label }}</span>
+            </div>
           </div>
-          <!-- 权重合计应当正好 100；不等于 100 说明后端配错了，这里如实显示出来 -->
-          <div class="weight-chip total" :class="{ bad: predictionStore.weightTotal !== 100 }">
-            <span class="w-label">合计</span>
-            <span class="w-value">{{ predictionStore.weightTotal }}</span>
-          </div>
-        </div>
-        <el-alert
-          v-if="predictionStore.weightTotal !== 100"
-          type="warning"
-          :closable="false"
-          show-icon
-          title="权重合计不等于 100，请检查后端配置"
-          class="algo-warn"
-        />
-        <ul class="algo-notes">
-          <li>
-            概率与排名都由后端<b>现算</b>：数据库里只存六维原始分，
-            不存「算好的概率」——存两份迟早会对不上。
-          </li>
-          <li>
-            全程整数运算（不碰浮点），避免
-            <code>0.15 + 0.2 + …</code> 累加后差 1 的经典误差。
-          </li>
-        </ul>
-      </el-card>
+        </el-card>
     </template>
   </div>
 </template>
@@ -293,6 +273,7 @@ function retry() {
 .team-item {
   display: flex;
   align-items: stretch;
+  flex-wrap: wrap;
   gap: 18px;
   padding: 16px;
   border: 1px solid var(--el-border-color-lighter);
@@ -468,6 +449,17 @@ function retry() {
   align-self: center;
   font-size: 12px;
   color: var(--el-text-color-placeholder);
+}
+
+/* 底部 AI 分析文字：占满整行，与上方三列用虚线分隔 */
+.ti-analysis {
+  flex: 1 0 100%;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--el-text-color-secondary);
 }
 
 /* 窄屏：三段竖排，避免横向挤爆 */

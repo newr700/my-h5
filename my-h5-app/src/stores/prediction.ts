@@ -192,10 +192,7 @@ export const usePredictionStore = defineStore('predictionTeams', () => {
     }, () => weights.value.length > 0)
   }
 
-  /** 权重合计（展示用，正常应正好 100；不等于 100 说明后端权重配错了，页面会显示出来） */
-  const weightTotal = computed(() => weights.value.reduce((sum, w) => sum + w.score, 0))
-
-  return { teams, weights, loading, refreshing, error, loadPredictions, loadAlgorithm, weightTotal }
+  return { teams, weights, loading, refreshing, error, loadPredictions, loadAlgorithm }
 })
 
 // ══════════════════════════════════════════════════════════════════

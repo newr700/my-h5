@@ -147,9 +147,9 @@ export interface TeamBrief {
 /**
  * 一个维度的分数（对应 vo/DimScoreVo.java）
  *
- * 同一个形状代表两种含义，靠接口路径区分，不重复定义两个类型：
- * - /teams 里：这支球队在该维度的得分
- * - /algorithm 里：该维度的权重（合计 100）
+ * 同一形状在两处复用，靠接口路径区分，不重复定义两个类型：
+ * - /teams 里：这支球队在该维度的得分（0~100）
+ * - /algorithm 里：该维度的定义（仅 key / label 有意义，score 恒为 0）
  */
 export interface DimScore {
   /** 维度 key，如 'history' / 'star' */
@@ -179,12 +179,14 @@ export interface TeamPrediction {
   colorSecondary: string
   logoUrl: string
   /**
-   * 夺冠概率百分数（0~100）—— 由后端按六维加权现算出来的，不是数据库里的字段。
-   * 存一份「算好的概率」等于存了两份可能打架的真相，所以这里只传结果不存底稿。
+   * 夺冠概率百分数（0~100）—— 文档直接给定的事实值（后端不再加权算）。
+   * 各队概率之和不保证为 100（模型输出口径），它就是「夺冠概率估计值」。
    */
   winProbability: number
-  /** 六个维度的得分，顺序 = 雷达图六个顶点的顺时针顺序，照顺序画即可 */
+  /** 五个评估维度的得分，顺序 = 雷达图五个顶点的顺时针顺序，照顺序画即可 */
   dims: DimScore[]
+  /** 文档给定的 AI 分析文字，可能为空串 */
+  analysis: string
   /** 可能是空数组（只有头部球队配了球员），页面必须能优雅显示空态 */
   starPlayers: StarPlayer[]
 }
