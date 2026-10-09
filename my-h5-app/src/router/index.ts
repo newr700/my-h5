@@ -1,7 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import userRoutes from './modules/user'
 import standingsRoutes from './modules/standings'
+import analysisRoutes from './modules/analysis'
 import predictionRoutes from './modules/prediction'
+import historyRoutes from './modules/history'
 
 /**
  * 路由总表 —— 各模块的路由在 modules/ 下各自维护。
@@ -27,7 +29,9 @@ const router = createRouter({
     { path: '/', redirect: '/user' },
     ...userRoutes,
     ...standingsRoutes,
-    ...predictionRoutes
+    ...analysisRoutes,
+    ...predictionRoutes,
+    ...historyRoutes
   ]
 })
 
