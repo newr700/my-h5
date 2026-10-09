@@ -210,7 +210,8 @@ function parseSeason(raw: unknown, index: number): SeasonHistory {
     seasonLabel: asString(raw.seasonLabel, at('seasonLabel')),
     champion: parseTeamBrief(raw.champion, at('champion')),
     runnerUp: parseTeamBrief(raw.runnerUp, at('runnerUp')),
-    third: parseTeamBrief(raw.third, at('third'))
+    third: parseTeamBrief(raw.third, at('third')),
+    fourth: parseTeamBrief(raw.fourth, at('fourth'))
   }
 }
 
@@ -233,7 +234,7 @@ function parseTitleCount(raw: unknown, index: number): TitleCount {
   }
 }
 
-/** 2000 年以来夺冠次数 Top5（后端现算 GROUP BY，追加赛季自动更新） */
+/** 英超历届夺冠次数（全时期，后端现算 GROUP BY，追加赛季自动更新） */
 export async function fetchTitleCounts(): Promise<TitleCount[]> {
   const raw = await get<unknown>('/prediction/history/titles')
   const list = asArray(raw, 'titles')

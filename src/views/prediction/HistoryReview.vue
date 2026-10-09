@@ -7,8 +7,8 @@ import { useHistoryStore } from '@/stores/prediction'
 /**
  * 页面5：历史回顾（草图最后一张）
  *
- * 上半部「历届战绩」：届数 / 赛季 / 冠军 / 亚军 / 季军，按届数倒序（最新在最前）。
- * 下半部「2000 年以来夺冠次数」：只显示前 5 名。
+ * 上半部「历届战绩」：届数 / 赛季 / 冠军 / 亚军 / 季军 / 殿军，按届数倒序（最新在最前）。
+ * 下半部「英超历届夺冠次数」：全时期（1992-93 起），由 season_history 现算。
  *
  * ── 赛季标签为什么不在这里拼 ──────────────────────────────
  * 接口直接给了 seasonLabel（如 "2024-25"）。
@@ -110,10 +110,25 @@ function retry() {
             </div>
           </template>
         </el-table-column>
+        <el-table-column label="殿军" min-width="140">
+          <template #default="{ row }">
+            <div class="cell-team">
+              <TeamCrest
+                :short-name="row.fourth.shortName"
+                :color-primary="row.fourth.colorPrimary"
+                :color-secondary="row.fourth.colorSecondary"
+                :logo-url="row.fourth.logoUrl"
+                :team-name="row.fourth.teamName"
+                :size="22"
+              />
+              <span>{{ row.fourth.teamName }}</span>
+            </div>
+          </template>
+        </el-table-column>
       </el-table>
 
-      <!-- ── 2000 年以来夺冠次数（现算，追加赛季自动更新）────── -->
-      <h3 class="sec-title">2000 年以来夺冠次数</h3>
+      <!-- ── 英超历届夺冠次数（现算，追加赛季自动更新）────── -->
+      <h3 class="sec-title">英超历届夺冠次数（自 1992-93 起）</h3>
       <el-card shadow="never" class="title-card">
         <div v-for="(item, i) in titles" :key="item.team.teamName" class="bar-row">
           <span class="bar-rank">{{ i + 1 }}</span>
@@ -139,7 +154,7 @@ function retry() {
         </div>
         <p class="bar-note">
           由 season_history 现算（GROUP BY + COUNT），不单独维护统计字段 ——
-          追加新赛季后本榜自动更新。
+          追加新赛季后本榜自动更新。统计口径为全时期（1992-93 起）。
         </p>
       </el-card>
     </template>
