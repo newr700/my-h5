@@ -69,8 +69,48 @@ npm run preview
 | 导航栏三个入口 | ✅ 完成 | `App.vue` 追加三项，窄屏自动换行 |
 | 类型检查 | ✅ 通过 | `npm run type-check`（vue-tsc）零错误 |
 | 评论写接口三态 | ✅ 已联调验证 | 2026-10-08 跑通：未登录 1101 / 普通用户 6002 / 专家成功落库 |
+| 页面主题背景 | ✅ 完成 | 四个页面各配一张背景图 + 白色区块透明化，见下方「页面视觉」 |
 
 > 结论：**前后端已打通，三个界面可以打开看，发表评论权限也已验证。**
+
+### 页面视觉：主题背景与「白色区域透明化」
+
+四个页面各配一张英超狮子主题图当背景，配色一一对应：
+
+| 页面 | 路由 | 背景图 | 主色调 |
+| --- | --- | --- | --- |
+| 积分榜 | `/standings` | `src/assets/backgrounds/standings.jpg` | 青蓝 |
+| 权威解析 | `/analysis` | `src/assets/backgrounds/analysis.jpg` | 蓝紫 |
+| AI 预测 | `/prediction` | `src/assets/backgrounds/prediction.jpg` | 浅绿 |
+| 历史回顾 | `/history` | `src/assets/backgrounds/history.jpg` | 黄绿 |
+
+**背景为什么用 `position: fixed` 的伪元素，而不是直接给 `.page` 加 `background-image`**：
+
+1. `.app-main` 有 24px 内边距（`responsive.css`），背景直接加在 `.page` 上会在四周露出一圈白边；
+2. AI 预测页有几十张雷达图、内容高达数千像素，`background-size: cover` 是按**元素尺寸**拉伸的——
+   1080px 高的图会被放大到几千像素，糊成一片色块。`fixed` 把图片锚定在**视口**上，页面再长也不变形；
+3. 固定定位不参与布局，原有间距一个像素都不用改。
+
+配合 `position: relative; z-index: 0` 让 `.page` 成为堆叠上下文，伪元素的 `z-index: -1` 就正好落在
+`#app` 白底之上、页面内容之下（否则负 z-index 会被 `#app` 的白色背景盖住）。
+
+**白色区域怎么变透**：不逐个组件 `:deep()` 穿透，而是在 `.page` 上覆盖 Element Plus 的 CSS 变量——
+组件内部都读这些变量，改一处就全透：
+
+```css
+.page {
+  --el-card-bg-color: rgba(255, 255, 255, 0.78);   /* 卡片 */
+  --el-fill-color-blank: rgba(255, 255, 255, 0.72); /* 输入框 / 按钮 */
+  --el-fill-color-lighter: rgba(255, 255, 255, 0.46);
+  /* 表格的「白」分散在三个变量里，只改一个会出现
+     「表头透了、数据行还是白的」这种半吊子效果 */
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: rgba(255, 255, 255, 0.62);
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.82);
+}
+```
+
+背景图上还叠了一层 `rgba(255,255,255,.42)` 的白色遮罩压低对比度，保证卡片里的文字始终读得清。
 
 ### 接口一览
 

@@ -176,23 +176,27 @@ onMounted(() => {
           </el-button>
         </div>
 
-        <!-- 评论区：展开后才渲染 -->
-        <div v-if="expanded[item.id]" class="comments">
-          <div v-if="analysisStore.commentsOf(item.id).length === 0" class="empty-comment">
-            {{ lang === 'zh' ? '还没有人发表观点' : 'No comments yet' }}
-          </div>
-          <div v-for="c in analysisStore.commentsOf(item.id)" :key="c.id" class="comment">
-            <el-avatar :size="28">{{ c.nickname.charAt(0).toUpperCase() }}</el-avatar>
-            <div class="comment-body">
-              <div class="comment-head">
-                <span class="cname">{{ c.nickname }}</span>
-                <!-- 等级标签用发布当时的快照，不是用户现在的等级 -->
-                <el-tag v-if="c.userLevel >= 2" size="small" type="warning" effect="light">
-                  行业专家
-                </el-tag>
-                <span class="ctime">{{ c.createdAt }}</span>
+        <!-- 评论区：展开后才渲染。外层 comments-wrap 是容器，
+             .comments 才是横向排开的评论列表（卡片左右滚动），
+             输入框/升级入口在列表下方占满整行 -->
+        <div v-if="expanded[item.id]" class="comments-wrap">
+          <div class="comments">
+            <div v-if="analysisStore.commentsOf(item.id).length === 0" class="empty-comment">
+              {{ lang === 'zh' ? '还没有人发表观点' : 'No comments yet' }}
+            </div>
+            <div v-for="c in analysisStore.commentsOf(item.id)" :key="c.id" class="comment">
+              <el-avatar :size="28">{{ c.nickname.charAt(0).toUpperCase() }}</el-avatar>
+              <div class="comment-body">
+                <div class="comment-head">
+                  <span class="cname">{{ c.nickname }}</span>
+                  <!-- 等级标签用发布当时的快照，不是用户现在的等级 -->
+                  <el-tag v-if="c.userLevel >= 2" size="small" type="warning" effect="light">
+                    行业专家
+                  </el-tag>
+                  <span class="ctime">{{ c.createdAt }}</span>
+                </div>
+                <div class="ctext">{{ c.content }}</div>
               </div>
-              <div class="ctext">{{ c.content }}</div>
             </div>
           </div>
 
@@ -244,6 +248,37 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* 建立堆叠上下文：让下方 ::before 那层背景（z-index:-1）
+   正好压在 #app 的白底之上、页面内容之下 */
+.page {
+  position: relative;
+  z-index: 0;
+
+  /* 白色区域统一降透明度：Element Plus 的组件内部都读这些变量，
+     改这一处，卡片/输入框/评论区会一起变透 */
+  --el-card-bg-color: rgba(255, 255, 255, 0.78);
+  --el-fill-color-blank: rgba(255, 255, 255, 0.72);
+  --el-fill-color-lighter: rgba(255, 255, 255, 0.6);
+}
+
+/* ── 主题背景（权威解析配色：蓝紫）────────────────────────────
+ * 固定定位的伪元素铺满视口当壁纸：不参与布局（原有间距不动）、
+ * 锚定视口（页面再长也不会把图拉伸变形）、z-index:-1（永远在内容下面）。
+ * 上面叠一层白色半透明遮罩，压低背景对比度，保证卡片上的文字读得清。 */
+.page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.42)),
+    url('../../assets/backgrounds/analysis.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 .page-head {
   display: flex;
   align-items: flex-start;
@@ -260,15 +295,19 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
   font-size: 13px;
 }
+/* 权威解析：每块解析横向占满（单列、撑满整行），
+   不再多列并排 —— 让专家观点有更宽的阅读宽度 */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 .card-skeleton {
   padding: 16px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 8px;
+  /* 骨架屏也跟正式卡片一样半透明，加载完切换时不会「白块突然变透」 */
+  background: rgba(255, 255, 255, 0.72);
 }
 /* 卡片左侧用球队主色描一道竖线 —— 草图批注「专家可以选择颜色来标记（用球队颜色）」 */
 .expert-card {
@@ -311,20 +350,40 @@ onMounted(() => {
 .caret.open {
   transform: rotate(180deg);
 }
-.comments {
+.comments-wrap {
   margin-top: 12px;
   border-top: 1px dashed var(--el-border-color-lighter);
   padding-top: 12px;
+}
+/* 横向展开：评论以卡片形式横向排开，超出视口可左右滚动。
+   每条评论是一张固定宽度的卡片（头像 + 内容上下排布），整体向右延伸。 */
+.comments {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
 }
 .empty-comment {
   color: var(--el-text-color-placeholder);
   font-size: 13px;
   padding: 8px 0;
+  flex: 0 0 auto;
 }
 .comment {
+  flex: 0 0 300px;
   display: flex;
   gap: 10px;
-  padding: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--el-fill-color-blank);
+}
+.comment-body {
+  min-width: 0;
+  flex: 1;
 }
 .comment-head {
   display: flex;

@@ -147,6 +147,42 @@ function retry() {
 </template>
 
 <style scoped>
+/* 建立堆叠上下文：让下方 ::before 那层背景（z-index:-1）
+   正好压在 #app 的白底之上、页面内容之下 */
+.page {
+  position: relative;
+  z-index: 0;
+
+  /* 白色区域统一降透明度（Element Plus 组件内部读这些变量）。
+     表格单独一组：表格的「白」分散在行 / 表头 / 斑马纹三个变量里，
+     只改一个会得到「表头透了、数据行还是白的」这种半吊子效果。 */
+  --el-card-bg-color: rgba(255, 255, 255, 0.78);
+  --el-fill-color-blank: rgba(255, 255, 255, 0.72);
+  --el-fill-color-lighter: rgba(255, 255, 255, 0.46);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: rgba(255, 255, 255, 0.62);
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.82);
+  --el-table-row-hover-bg-color: rgba(255, 255, 255, 0.95);
+}
+
+/* ── 主题背景（历史回顾配色：黄绿）────────────────────────────
+ * 固定定位的伪元素铺满视口当壁纸：不参与布局（原有间距不动）、
+ * 锚定视口（这张表可以滚很久，随内容拉伸会把图糊掉）、
+ * z-index:-1（永远在内容下面）。上面叠白色半透明遮罩保证可读性。 */
+.page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.42)),
+    url('../../assets/backgrounds/history.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 .page-head {
   margin-bottom: 16px;
 }
