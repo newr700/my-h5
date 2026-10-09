@@ -172,16 +172,22 @@ function retry() {
             </div>
           </div>
 
-          <!-- 右：两张球星照片（有图显示图，无图显示队色占位卡） -->
+          <!-- 右：球星照片（有图显示照片 + 球衣号角标；无图显示队色占位卡） -->
           <div class="ti-stars">
             <template v-if="t.starPlayers.length > 0">
               <div v-for="s in t.starPlayers.slice(0, 2)" :key="s.playerName" class="star-photo">
-                <img v-if="s.photoUrl" :src="s.photoUrl" :alt="s.playerName" class="star-img" />
-                <div v-else class="star-card">
-                  <span class="sc-num">{{ s.jerseyNumber }}</span>
-                  <span class="sc-init">{{ s.playerName.charAt(0) }}</span>
+                <div class="star-frame">
+                  <img v-if="s.photoUrl" :src="s.photoUrl" :alt="s.playerName" class="star-img" />
+                  <div v-else class="star-card">
+                    <span class="sc-num">{{ s.jerseyNumber }}</span>
+                    <span class="sc-init">{{ s.playerName.charAt(0) }}</span>
+                  </div>
+                  <span v-if="s.jerseyNumber > 0" class="star-jersey">{{ s.jerseyNumber }}</span>
                 </div>
-                <div class="star-cap">{{ s.jerseyNumber }} {{ s.playerName }}</div>
+                <div class="star-cap">
+                  <span class="star-name">{{ s.playerName }}</span>
+                  <span v-if="s.position" class="star-pos">{{ s.position }}</span>
+                </div>
               </div>
             </template>
             <span v-else class="no-star">暂无球星资料</span>
@@ -393,7 +399,7 @@ function retry() {
   opacity: 0;
 }
 
-/* 右：两张球星照片 */
+/* 右：球星照片 */
 .ti-stars {
   flex: 0 0 180px;
   display: flex;
@@ -406,6 +412,11 @@ function retry() {
   gap: 4px;
   min-width: 0;
 }
+/* 照片框：相对定位，作为球衣号角标的定位原点 */
+.star-frame {
+  position: relative;
+  width: 100%;
+}
 .star-img {
   width: 100%;
   aspect-ratio: 3 / 4;
@@ -413,6 +424,28 @@ function retry() {
   border-radius: 8px;
   background: var(--el-fill-color-lighter);
   display: block;
+  /* 照片上方压一层极淡暗角，保证角标与姓名在亮色照片上也清晰 */
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+/* 球衣号角标：贴在照片左上角，像真实球衣号码牌 */
+.star-jersey {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  background: rgba(20, 28, 40, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 6px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 /* 无照片时的占位卡：队色渐变 + 球衣号 + 姓名首字，读起来像一张球员卡 */
 .star-card {
@@ -438,12 +471,25 @@ function retry() {
   font-weight: 700;
 }
 .star-cap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.star-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+}
+.star-pos {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
 }
 .no-star {
   align-self: center;
