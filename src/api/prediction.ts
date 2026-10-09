@@ -25,8 +25,8 @@ import type {
  * 免得运营多录一位专家，整个页面就白屏 —— 那属于把后端的数据决策写死在前端里。
  */
 
-/** 六维雷达图的顶点数：形状写死才有意义（少一维图就画不圆），所以这里是严格数字 */
-const DIM_COUNT = 6
+/** 雷达图的顶点数：形状写死才有意义（少一维图就画不圆），所以这里是严格数字 */
+const DIM_COUNT = 5
 
 /** 把后端返回的一支球队资料，逐字段校验成 TeamBrief */
 function parseTeamBrief(raw: unknown, path: string): TeamBrief {
@@ -169,6 +169,8 @@ function parsePrediction(raw: unknown, index: number): TeamPrediction {
     logoUrl: asString(raw.logoUrl, at('logoUrl'), ''),
     winProbability: asNumber(raw.winProbability, at('winProbability')),
     dims: rawDims.map((d, i) => parseDim(d, `teams[${index}].dims[${i}]`)),
+    // 分析文字是文档给定的，缺失就当空串（该队卡片不显示分析块）
+    analysis: asString(raw.analysis, at('analysis'), ''),
     // 明星球员是可选内容：没配就是空数组，页面显示「暂无」而不是报错
     starPlayers: (raw.starPlayers === undefined || raw.starPlayers === null
       ? []
@@ -185,7 +187,7 @@ export async function fetchPredictions(): Promise<TeamPrediction[]> {
   return list.map(parsePrediction)
 }
 
-/** 六维权重说明 —— 页面底部的「算法依据」，值与计算所用权重同源，不会漂移 */
+/** AI 模型评估维度说明 —— 页面底部「数据说明」区展示维度名称与顺序 */
 export async function fetchAlgorithm(): Promise<DimScore[]> {
   const raw = await get<unknown>('/prediction/algorithm')
   const list = asArray(raw, 'algorithm')
