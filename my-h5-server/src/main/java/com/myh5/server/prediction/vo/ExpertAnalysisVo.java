@@ -14,6 +14,7 @@ public record ExpertAnalysisVo(
         long id,
         String nameEn,
         String nameCn,
+        String title,
         String teamName,
         String teamNameEn,
         String shortName,

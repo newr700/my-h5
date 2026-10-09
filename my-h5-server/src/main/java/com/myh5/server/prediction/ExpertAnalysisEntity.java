@@ -21,6 +21,10 @@ public class ExpertAnalysisEntity {
     @TableField("expert_name_cn")
     private String expertNameCn;
 
+    /** 专家身份/头衔，如「资深英超解说，擅长数据复盘」—— 卡片上姓名下方的标签 */
+    @TableField("expert_title")
+    private String expertTitle;
+
     /** 该专家支持的球队，决定这张卡片的配色 */
     private String teamName;
 
