@@ -95,6 +95,15 @@ function onCommand(command: string) {
    宁可占两行，也不让用户以为某个入口不存在 */
 .app-nav {
   flex-wrap: wrap;
+  /* 背景图任务给每个页面的 .page 根元素加了 position:relative;z-index:0，
+     会形成一个「高于普通文档流」的堆叠上下文，把固定定位的页面背景(::before)
+     连带抬到顶部导航栏之上，导致导航栏被背景图盖住、看起来像透明。
+     这里用 sticky 把导航栏钉在视口顶部、不随页面下拉而消失，并抬到更高层级 +
+     给实底，恢复原本「不透明白色导航栏」且始终可见的观感。 */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #fff;
 }
 /* el-menu 本身是 flex 容器，品牌名和右侧区都是它的子节点，可直接参与布局 */
 .brand {

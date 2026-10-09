@@ -184,10 +184,42 @@ function rankBadgeClass(team: TeamStanding) {
  * 改用 Element Plus 桌面组件库后，页面按真实像素书写，PC 上即所见尺寸，
  * 手机上偏小但可读（项目定位为 PC 为主、手机兼顾）。 */
 
+/* 建立堆叠上下文：让下方 ::before 那层背景（z-index:-1）
+   正好压在 #app 的白底之上、页面内容之下 */
 .page {
+  position: relative;
+  z-index: 0;
   min-height: 100vh;
-  background: #ffffff;
   padding: 0 24px;
+
+  /* 白色区域统一降透明度。
+     Element Plus 的组件内部都读这些变量，所以改这一处，
+     卡片/表格/输入框会一起变透，不必逐个组件去 :deep() 穿透覆盖。
+     数值统一取 0.55~0.78：太透看不清内容，太实又回到「一堵白墙」。 */
+  --el-card-bg-color: rgba(255, 255, 255, 0.78);
+  --el-fill-color-blank: rgba(255, 255, 255, 0.72);
+  --el-fill-color-lighter: rgba(255, 255, 255, 0.6);
+}
+
+/* ── 主题背景（积分榜配色：青蓝）──────────────────────────────
+ * 用固定定位的伪元素铺满整个视口当壁纸，三个好处：
+ *   · 不参与布局 —— 卡片、表格的原有间距一个像素都不用动；
+ *   · 锚定视口 —— 本页内容可长达数千像素，若随内容拉伸，
+ *     1080px 高的图会被放大到糊成一片色块；
+ *   · z-index:-1 —— 永远压在内容下面，不会挡住按钮点击。
+ * 上面叠一层白色半透明遮罩，压低背景对比度，保证文字始终读得清。 */
+.page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.42)),
+    url('../../assets/backgrounds/standings.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 /* 标题栏：左标题，右侧是「刷新按钮 + 图例」 */
@@ -255,11 +287,14 @@ function rankBadgeClass(team: TeamStanding) {
   padding: 10px 12px;
   border-bottom: 1px solid #f2f6fc;
   font-size: 13px;
+  /* 每一行是一小块半透明白：背景图从下面透出来，又不影响读数字 */
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .row--header {
   font-weight: bold;
-  background: #f5f7fa;
+  /* 表头比数据行更实一点，让「表头 ←→ 数据」有一层视觉台阶 */
+  background: rgba(255, 255, 255, 0.78);
   /* 表头是列表最顶一行：只圆「左右上角」，与下方内容自然衔接 */
   border-radius: 8px 8px 0 0;
 }
@@ -369,7 +404,7 @@ function rankBadgeClass(team: TeamStanding) {
   /* hover 是 PC 独有的交互态：手指没有「悬停」这个概念。
      放在断点外的后果是手机端点完一行，高亮残留在屏幕上不走。 */
   .row:hover {
-    background: #f5f7fa;
+    background: rgba(255, 255, 255, 0.88);
   }
 
   /* 列宽同步放大：字号变大后，原来的 40px 排名列装不下队徽 */
