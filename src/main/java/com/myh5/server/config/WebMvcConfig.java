@@ -35,7 +35,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(authInterceptor)
-                .addPathPatterns("/order/**", "/user/**")
+                .addPathPatterns("/user/**")
                 // V7 新增：发表评论是写操作，必须登录。
                 // 注意这里保护的是【一个具体路径】而不是整个 /prediction/** ——
                 // 三个读接口（权威解析 / AI 预测 / 历史回顾）是公开的，
