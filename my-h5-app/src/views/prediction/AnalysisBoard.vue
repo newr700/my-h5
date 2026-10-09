@@ -34,7 +34,8 @@ const drafts = ref<Record<number, string>>({})
 const submitting = ref<Record<number, boolean>>({})
 
 /** 专家姓名按当前语言取：中文优先给中文名，英文化时给本名 */
-const expertName = (zh: string, en: string) => (lang.value === 'zh' ? zh : en)
+/** 专家姓名按当前语言取：中文优先给中文名，英文化时给本名；文档无英文名则回退中文 */
+const expertName = (zh: string, en: string) => (lang.value === 'zh' ? zh : (en || zh))
 const teamLabel = (zh: string, en: string) => (lang.value === 'zh' ? zh : en)
 
 const analyses = computed(() => analysisStore.analyses)
@@ -163,6 +164,7 @@ onMounted(async () => {
             </el-avatar>
             <div class="expert-meta">
               <div class="expert-name">{{ expertName(item.nameCn, item.nameEn) }}</div>
+              <div v-if="item.title" class="expert-title">{{ item.title }}</div>
               <div class="expert-sub">
                 {{ lang === 'zh' ? '支持' : 'Backs' }}
                 <!-- 球队名 + 队徽：队徽颜色取自该队字典里的主/辅色 -->
@@ -349,6 +351,11 @@ onMounted(async () => {
 .expert-name {
   font-size: 15px;
   font-weight: 600;
+}
+.expert-title {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 .expert-sub {
   display: flex;
