@@ -60,7 +60,10 @@ public class PredictionService {
         List<TeamPredictionEntity> sorted = new ArrayList<>(predictionMapper.selectList(null));
         // 概率相同时用队名兜底排序：排序结果必须是【确定的】，
         // 否则两次请求顺序不同，用户会以为数据在跳（这类「不确定的排序」是分页 bug 的常见根源）
-        sorted.sort(Comparator.comparingInt(PredictionScoring::winProbability).reversed()
+        // 夺冠概率由文档直接给定（champion_probability），按它倒序；同分用队名兜底保证确定性
+        sorted.sort(Comparator.comparingInt(
+                        (TeamPredictionEntity e) -> e.getChampionProbability() == null ? 0 : e.getChampionProbability())
+                .reversed()
                 .thenComparing(TeamPredictionEntity::getTeamName));
 
         // rank 与积分榜同一套做法：排好序后名次就是下标 + 1，页面不自己算
@@ -70,16 +73,14 @@ public class PredictionService {
     }
 
     /**
-     * 下发模型权重，供页面上的「算法说明」展示。
+     * 下发给页面「数据说明」区展示的评估维度定义（名称 + 顺序）。
      *
-     * 【为什么要专门开一个接口把权重暴露出来】
-     * 一个「AI 预测」如果只给结论不给依据，用户只能无条件相信它。
-     * 把六个维度的权重摆出来，用户可以自己判断「这个模型看重什么」，
-     * 甚至可以说「我认为主客优势该给更高权重」—— 这才是可讨论的预测。
-     * 顺带一个工程好处：权重只有 DIMS 一处定义，前端展示的就是真实计算用的值，
-     * 不存在「文档写 20%、代码用 25%」的漂移。
+     * 【为什么维度定义要专门开一个接口暴露】
+     * 一个「AI 预测」如果只给结论不给维度，用户不知道这个分数从哪五个角度来。
+     * 把维度名称与顺序摆出来，页面才能画出对应的雷达图坐标轴、并给出可读的说明。
+     * 维度只有 DIMS 一处定义，前端展示的就是后端真实使用的维度，不会漂移。
      *
-     * 复用 DimScoreVo 传权重（score 字段这次装的是权重值），
+     * 复用 DimScoreVo 传维度（score 字段本次不再表示权重、恒为 0），
      * 省得为一个纯展示需求再造一个几乎相同的类型。
      */
     public List<DimScoreVo> weights() {
@@ -114,7 +115,7 @@ public class PredictionService {
                                   Map<String, List<StarPlayerVo>> starPlayerMap) {
         FootballTeamEntity team = teamMap.get(e.getTeamName());
 
-        // 维度顺序直接来自 DIMS —— 前端雷达图照着画，就不会出现「后端加了第七维、前端还是六边形」
+        // 维度顺序直接来自 DIMS —— 前端雷达图照着画，就不会出现「后端改了维度、前端还是旧的」
         List<DimScoreVo> dims = PredictionScoring.DIMS.stream()
                 .map(d -> new DimScoreVo(d.key(), d.label(), d.extract().applyAsInt(e)))
                 .toList();
@@ -127,10 +128,13 @@ public class PredictionService {
                 team == null ? "#909399" : team.getColorPrimary(),
                 team == null ? "#C0C4CC" : team.getColorSecondary(),
                 team == null || team.getLogoUrl() == null ? "" : team.getLogoUrl(),
-                PredictionScoring.winProbability(e),
+                // 夺冠概率直接用文档给定值（不再加权算）
+                e.getChampionProbability() == null ? 0 : e.getChampionProbability(),
                 dims,
                 // 空列表也要给（不能给 null）：前端 v-for 一个 null 会直接报错
-                starPlayerMap.getOrDefault(e.getTeamName(), List.of())
+                starPlayerMap.getOrDefault(e.getTeamName(), List.of()),
+                // 分析文字可能为空串
+                e.getAnalysis() == null ? "" : e.getAnalysis()
         );
     }
 }

@@ -82,14 +82,14 @@ public class PredictionController {
     // ── 页面4：AI 预测 ────────────────────────────────────────
 
     @Operation(summary = "球队夺冠概率预测",
-            description = "按六维加权模型算出夺冠概率并倒序排列；rank 由后端生成")
+            description = "按文档给定的夺冠概率倒序排列；rank 由后端生成")
     @GetMapping("/teams")
     public Result<List<TeamPredictionVo>> teams() {
         return Result.ok(predictionService.listSorted());
     }
 
-    @Operation(summary = "预测模型权重说明",
-            description = "下发六个维度的权重，供页面展示算法依据；值即计算所用权重，不会与实现漂移")
+    @Operation(summary = "AI 模型评估维度说明",
+            description = "下发给页面展示的评估维度定义（名称与顺序即雷达图顶点）；概率由模型直接给出，非加权算出")
     @GetMapping("/algorithm")
     public Result<List<DimScoreVo>> algorithm() {
         return Result.ok(predictionService.weights());
