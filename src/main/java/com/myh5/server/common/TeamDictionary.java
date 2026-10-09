@@ -1,4 +1,4 @@
-package com.myh5.server.prediction;
+package com.myh5.server.common;
 
 import org.springframework.stereotype.Component;
 

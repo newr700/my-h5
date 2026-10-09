@@ -6,7 +6,7 @@
   为什么这条查询值得写 XML：它有 <foreach> 动态元素（IN 的元素个数由入参决定），
   在注解里拼这种字符串没有高亮、没有格式化、改个引号就崩 —— 到这类 SQL 就该搬进 XML。
 -->
-<mapper namespace="com.myh5.server.prediction.ExpertCommentMapper">
+<mapper namespace="com.myh5.server.analysis.ExpertCommentMapper">
 
     <!--
       批量统计「每条解析有多少条评论」。
@@ -21,7 +21,7 @@
       换一种写法（WHERE 里对该列做函数运算，如 DATE(created_at)=...）就会索引失效 ——
       索引失效最隐蔽的原因，就是把列包进了函数里。
     -->
-    <select id="countByAnalysisIds" resultType="com.myh5.server.prediction.AnalysisCommentCountRow">
+    <select id="countByAnalysisIds" resultType="com.myh5.server.analysis.AnalysisCommentCountRow">
         SELECT
             analysis_id    AS analysisId,
             COUNT(*)       AS commentCount

@@ -1,6 +1,6 @@
-package com.myh5.server.prediction.vo;
+package com.myh5.server.common.vo;
 
-import com.myh5.server.prediction.FootballTeamEntity;
+import com.myh5.server.common.FootballTeamEntity;
 
 /**
  * 球队简要信息（VO）—— 凡是「要显示队徽 + 队名」的地方都复用它。

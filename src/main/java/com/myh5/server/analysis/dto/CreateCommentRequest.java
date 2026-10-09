@@ -1,4 +1,4 @@
-package com.myh5.server.prediction.dto;
+package com.myh5.server.analysis.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

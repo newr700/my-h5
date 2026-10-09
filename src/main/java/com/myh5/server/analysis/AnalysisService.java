@@ -1,12 +1,12 @@
-package com.myh5.server.prediction;
+package com.myh5.server.analysis;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.myh5.server.auth.AuthContext;
 import com.myh5.server.common.BizException;
 import com.myh5.server.common.ErrorCodes;
-import com.myh5.server.prediction.dto.CreateCommentRequest;
-import com.myh5.server.prediction.vo.ExpertAnalysisVo;
-import com.myh5.server.prediction.vo.ExpertCommentVo;
+import com.myh5.server.analysis.dto.CreateCommentRequest;
+import com.myh5.server.analysis.vo.ExpertAnalysisVo;
+import com.myh5.server.analysis.vo.ExpertCommentVo;
 import com.myh5.server.user.UserEntity;
 import com.myh5.server.user.UserLevels;
 import com.myh5.server.user.UserMapper;
@@ -17,6 +17,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import com.myh5.server.common.FootballTeamEntity;
+import com.myh5.server.common.TeamDictionary;
 
 /**
  * 权威解析服务（页面2）。

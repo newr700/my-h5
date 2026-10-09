@@ -1,4 +1,4 @@
-package com.myh5.server.prediction.vo;
+package com.myh5.server.analysis.vo;
 
 import java.time.LocalDateTime;
 
