@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import userRoutes from './modules/user'
-import orderRoutes from './modules/order'
 import standingsRoutes from './modules/standings'
 import predictionRoutes from './modules/prediction'
 
@@ -27,7 +26,6 @@ const router = createRouter({
   routes: [
     { path: '/', redirect: '/user' },
     ...userRoutes,
-    ...orderRoutes,
     ...standingsRoutes,
     ...predictionRoutes
   ]

@@ -132,7 +132,6 @@ function onCommand(command: string) {
 /** 全部入口，顺序即展示顺序 */
 const navItems = [
   { path: '/user', label: '我的' },
-  { path: '/order', label: '购票' },
   { path: '/standings', label: '积分榜' },
   { path: '/analysis', label: '权威解析' },
   { path: '/prediction', label: 'AI 预测' },
