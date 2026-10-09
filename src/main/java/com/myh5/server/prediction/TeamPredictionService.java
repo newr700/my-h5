@@ -21,7 +21,7 @@ import java.util.stream.IntStream;
  * 「过滤和排序推给数据库是铁律」。这里为什么反过来了？
  *
  *   积分榜排的是 points / goals_for 这些【存储列】，数据库能直接排；
- *   夺冠概率是【六个列算出来的值】，SQL 里排它就得把权重表达式整套抄进 ORDER BY：
+ *   夺冠概率是【五个列算出来的值】，SQL 里排它就得把权重表达式整套抄进 ORDER BY：
  *       ORDER BY (history_score*15 + star_score*20 + ...) DESC
  *   于是权重同时存在于 PredictionScoring 和 SQL 字符串里，改一处忘一处 ——
  *   这正是本项目反复强调的「单一事实来源」被破坏。为 20 行数据引入这种维护风险，不值。
@@ -32,15 +32,15 @@ import java.util.stream.IntStream;
  *   但变的是结论不是原则：原则是「让排序发生在最懂它的地方，且只定义一次」。
  */
 @Service
-public class PredictionService {
+public class TeamPredictionService {
 
     private final TeamPredictionMapper predictionMapper;
     private final TeamStarPlayerMapper starPlayerMapper;
     private final TeamDictionary teamDictionary;
 
-    public PredictionService(TeamPredictionMapper predictionMapper,
-                             TeamStarPlayerMapper starPlayerMapper,
-                             TeamDictionary teamDictionary) {
+    public TeamPredictionService(TeamPredictionMapper predictionMapper,
+                                 TeamStarPlayerMapper starPlayerMapper,
+                                 TeamDictionary teamDictionary) {
         this.predictionMapper = predictionMapper;
         this.starPlayerMapper = starPlayerMapper;
         this.teamDictionary = teamDictionary;
@@ -49,7 +49,7 @@ public class PredictionService {
     /**
      * 按夺冠概率倒序返回全部球队。
      *
-     * 取数一共 3 次查询（六维评分 / 明星球员 / 球队字典），
+     * 取数一共 3 次查询（五维评分 / 明星球员 / 球队字典），
      * 而且是「取全量 → 内存里组装」，不是「循环里查库」的 N+1 ——
      * 20 支球队的场景下，3 次往返远优于 1 + 20 + 20 次。
      */

@@ -11,7 +11,7 @@ import lombok.Data;
  *
  * 这张表是「字典表」：三个新页面（权威解析 / AI 预测 / 历史回顾）都要用球队的颜色和缩写，
  * 于是把它抽成唯一事实来源。Service 一次性查出来放进 Map，再按队名回填到各页面的 VO 里 ——
- * 见 PredictionService / HistoryService 里的 teamMap 用法。
+ * 见 TeamPredictionService / HistoryService 里的 teamMap 用法。
  *
  * 为什么要走「内存里拼」而不是写三张表 JOIN 球队表的 SQL？
  * 因为这是 20 行的字典数据，一次查询的成本可以忽略；
