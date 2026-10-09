@@ -196,6 +196,8 @@ export interface ExpertAnalysis {
   nameEn: string
   /** 专家中文名，如 马丁·泰勒 —— 页面上的「中/英切换」切的就是用哪个字段 */
   nameCn: string
+  /** 专家身份/头衔，如「资深英超解说，擅长数据复盘」—— 姓名下方的小标签 */
+  title: string
   /** 他支持的那支球队（中文名） */
   teamName: string
   teamNameEn: string

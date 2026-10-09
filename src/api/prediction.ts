@@ -80,6 +80,7 @@ function parseAnalysis(raw: unknown, index: number): ExpertAnalysis {
     id: asNumber(raw.id, at('id')),
     nameEn: asString(raw.nameEn, at('nameEn')),
     nameCn: asString(raw.nameCn, at('nameCn')),
+    title: asString(raw.title, at('title'), ''),
     teamName: asString(raw.teamName, at('teamName')),
     teamNameEn: asString(raw.teamNameEn, at('teamNameEn')),
     shortName: asString(raw.shortName, at('shortName'), 'TBD'),
