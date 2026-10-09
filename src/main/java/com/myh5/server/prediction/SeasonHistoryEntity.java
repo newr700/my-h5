@@ -28,4 +28,8 @@ public class SeasonHistoryEntity {
 
     @TableField("third_team")
     private String thirdTeam;
+
+    /** 殿军（第 4 名）；文档「英超夺冠历史」给的是前四，原表只有冠亚季，V12 起补此列 */
+    @TableField("fourth_team")
+    private String fourthTeam;
 }

@@ -27,7 +27,7 @@ public interface SeasonHistoryMapper extends BaseMapper<SeasonHistoryEntity> {
      *
      * 结果由【现有数据现算】而不是另建一张统计表：
      * 统计数字与明细数据同源，永远不可能对不上（存两份 = 早晚不一致）。
-     * 这也是页面5「2000 年以来夺冠次数」在追加新赛季后自动更新的原因。
+     * 这也是页面5「英超历届夺冠次数」在追加新赛季后自动更新的原因。
      *
      * 【踩过的坑：接口上写了 @Select 才有 SQL】
      * Mapper 里多表/聚合方法如果既没有注解、也没有对应的 XML 语句，
@@ -40,8 +40,8 @@ public interface SeasonHistoryMapper extends BaseMapper<SeasonHistoryEntity> {
      * 两种在 MySQL / H2 上都对；写成表达式更保险 —— 个别数据库的 ORDER BY
      * 对别名解析有细微差别，而表达式到处都一样。
      *
-     * @param fromYear 起始赛季年份（含），页面口径为 2000
-     * @param limit    取前几名，页面口径为 5
+     * @param fromYear 起始赛季年份（含），页面口径为 1992（英超元年，即全时期）
+     * @param limit    取前几名，页面口径为 10
      */
     @Select("""
             SELECT

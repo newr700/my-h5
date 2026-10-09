@@ -20,9 +20,9 @@ import java.util.Map;
 @Service
 public class HistoryService {
 
-    /** 统计口径：草图上「2000 年以来夺冠次数」「只显示前 5 个球队」 */
-    private static final int TITLE_FROM_YEAR = 2000;
-    private static final int TITLE_TOP_N = 5;
+    /** 统计口径：草图上「历届夺冠次数」—— 全时期（自 1992-93 英超元年起）；只显示前 10 名 */
+    private static final int TITLE_FROM_YEAR = 1992;
+    private static final int TITLE_TOP_N = 10;
 
     private final SeasonHistoryMapper seasonHistoryMapper;
     private final TeamDictionary teamDictionary;
@@ -45,7 +45,8 @@ public class HistoryService {
                         seasonLabel(e.getSeasonYear()),
                         brief(teamMap, e.getChampionTeam()),
                         brief(teamMap, e.getRunnerUpTeam()),
-                        brief(teamMap, e.getThirdTeam())))
+                        brief(teamMap, e.getThirdTeam()),
+                        brief(teamMap, e.getFourthTeam())))
                 .toList();
     }
 
