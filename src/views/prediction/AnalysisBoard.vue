@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import TeamCrest from '@/components/TeamCrest.vue'
-import { useAnalysisStore } from '@/stores/prediction'
+import { useAnalysisStore } from '@/stores/analysis'
 import { useUserStore } from '@/stores/user'
 
 /**

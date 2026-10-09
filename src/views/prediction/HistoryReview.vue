@@ -2,7 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import TeamCrest from '@/components/TeamCrest.vue'
-import { useHistoryStore } from '@/stores/prediction'
+import { useHistoryStore } from '@/stores/history'
 
 /**
  * 页面5：历史回顾（草图最后一张）

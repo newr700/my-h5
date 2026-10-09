@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import TeamCrest from '@/components/TeamCrest.vue'
 import RadarChart from './components/RadarChart.vue'
-import { usePredictionStore } from '@/stores/prediction'
+import { useAiPredictionStore } from '@/stores/aiPrediction'
 
 /**
  * 页面4：AI 预测（草图中间那张）
@@ -18,7 +18,7 @@ import { usePredictionStore } from '@/stores/prediction'
  * 若前端也写一遍公式，改权重时就得同时改两处，漏一处就是「页面说的话和入口里的结果不一致」。
  * 所以前端只做【展示】，所有数字都是后端现算后下发的结果。
  */
-const predictionStore = usePredictionStore()
+const predictionStore = useAiPredictionStore()
 
 /** 雷达图上是否显示数值（对应草图「要可调数字显示」） */
 const showValue = ref(true)
