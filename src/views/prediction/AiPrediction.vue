@@ -27,8 +27,9 @@ const teams = computed(() => predictionStore.teams)
 
 /**
  * 六维属性浮层：跟随鼠标移动显示（参考图那效果）。
- * 只记录「当前悬浮的是哪一队」+「鼠标在雷达区内的坐标」，
- * 坐标相对 .ti-radar 计算，浮层用 absolute 定位贴到鼠标旁。
+ * 只记录「当前悬浮的是哪一队」+「鼠标在雷达图内的坐标」，
+ * 坐标相对紧贴雷达图的 .ti-radar-hit 计算（不是外层 .ti-radar，那个范围偏大），
+ * 浮层用 absolute 定位贴到鼠标旁。
  * 靠近容器右下边缘时翻折到鼠标另一侧，避免浮层被裁。
  */
 const hoverRank = ref<number | null>(null)
@@ -137,31 +138,38 @@ function retry() {
           </div>
 
           <!-- 中：雷达图；鼠标悬浮时六维属性以浮层跟随鼠标移动（参考图效果） -->
-          <div
-            class="ti-radar"
-            @mousemove="onRadarMove($event, t.rank)"
-            @mouseleave="onRadarLeave"
-          >
-            <RadarChart :dims="t.dims" :color-primary="t.colorPrimary" :show-value="showValue" />
-            <transition name="tip">
-              <div
-                v-if="hoverRank === t.rank"
-                class="ti-dims"
-                :style="{
-                  left: tip.x + 'px',
-                  top: tip.y + 'px',
-                  transform: tip.flipX
-                    ? `translate(calc(-100% - 14px), ${tip.flipY ? 'calc(-100% - 12px)' : '12px'})`
-                    : `translate(14px, ${tip.flipY ? 'calc(-100% - 12px)' : '12px'})`
-                }"
-              >
-                <div class="ti-dims-title">{{ t.teamName }}</div>
-                <div v-for="d in t.dims" :key="d.key" class="ti-dim">
-                  <span class="ti-dim-label">{{ d.label }}</span>
-                  <span class="ti-dim-score">{{ d.score }}</span>
+          <div class="ti-radar">
+            <!-- 事件绑在紧贴雷达图的 .ti-radar-hit 上，而不是外层 .ti-radar：
+                 .ti-radar 是 flex:1 的自适应容器，雷达图居中后两侧会留出空白，
+                 绑在它上面会导致「鼠标还在卡片空白处就已经显示浮层」。
+                 另外不能直接绑 <svg>——内联 SVG 未被绘制的空白区默认不接收鼠标事件，
+                 那样只有精确指到网格线/多边形上才会触发，很难用。 -->
+            <div
+              class="ti-radar-hit"
+              @mousemove="onRadarMove($event, t.rank)"
+              @mouseleave="onRadarLeave"
+            >
+              <RadarChart :dims="t.dims" :color-primary="t.colorPrimary" :show-value="showValue" />
+              <transition name="tip">
+                <div
+                  v-if="hoverRank === t.rank"
+                  class="ti-dims"
+                  :style="{
+                    left: tip.x + 'px',
+                    top: tip.y + 'px',
+                    transform: tip.flipX
+                      ? `translate(calc(-100% - 14px), ${tip.flipY ? 'calc(-100% - 12px)' : '12px'})`
+                      : `translate(14px, ${tip.flipY ? 'calc(-100% - 12px)' : '12px'})`
+                  }"
+                >
+                  <div class="ti-dims-title">{{ t.teamName }}</div>
+                  <div v-for="d in t.dims" :key="d.key" class="ti-dim">
+                    <span class="ti-dim-label">{{ d.label }}</span>
+                    <span class="ti-dim-score">{{ d.score }}</span>
+                  </div>
                 </div>
-              </div>
-            </transition>
+              </transition>
+            </div>
           </div>
 
           <!-- 右：两张球星照片（有图显示图，无图显示队色占位卡） -->
@@ -332,8 +340,26 @@ function retry() {
   align-items: center;
   justify-content: center;
 }
+/* 紧贴雷达图尺寸的「悬浮命中区」：宽度与 .radar 的 max-width 对齐，
+   所以只有鼠标真正落在雷达图这块方块上才触发，两侧留白不算。
+   同时它也是六维浮层的定位原点（before 是 .ti-radar 兼任，范围偏大）。 */
+.ti-radar-hit {
+  position: relative;
+  width: 100%;
+  max-width: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .ti-radar :deep(.radar) {
   max-width: 240px;
+  /* 悬浮轻微放大、离开回弹：给「这里可以看详情」的触感。
+     用 transform 而不是改 width/max-width，不触发重排、周围元素不会被顶开。 */
+  transition: transform 0.22s cubic-bezier(0.34, 1.16, 0.64, 1);
+  transform-origin: center center;
+}
+.ti-radar-hit:hover :deep(.radar) {
+  transform: scale(1.08);
 }
 /* 六维属性浮层：深蓝底的小卡片，跟随鼠标移动（参考图效果）。
    pointer-events:none 让鼠标"穿透"浮层，continue 触发 .ti-radar 的 mousemove，

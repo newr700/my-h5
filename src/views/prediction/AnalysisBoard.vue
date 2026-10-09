@@ -39,16 +39,21 @@ const teamLabel = (zh: string, en: string) => (lang.value === 'zh' ? zh : en)
 
 const analyses = computed(() => analysisStore.analyses)
 
-async function toggleComments(id: number) {
-  const next = !expanded.value[id]
-  expanded.value = { ...expanded.value, [id]: next }
-  // 展开时才去拉评论（按需加载）；已经缓存过也不会重复请求
-  if (next && analysisStore.commentsOf(id).length === 0) {
-    try {
-      await analysisStore.loadComments(id)
-    } catch {
-      ElMessage.error('评论加载失败，请稍后重试')
-    }
+/**
+ * 展开/收起评论区。
+ * 评论在进页面时已经一次性拉全了，所以这里只切换本地状态、不发请求 ——
+ * 展开即出内容，不会「先空一下再突然填满」。
+ */
+function toggleComments(id: number) {
+  expanded.value = { ...expanded.value, [id]: !expanded.value[id] }
+}
+
+/** 某条解析的评论拉取失败后的重试（只重拉这一条） */
+async function retryComments(id: number) {
+  try {
+    await analysisStore.loadComments(id)
+  } catch {
+    ElMessage.error('评论加载失败，请稍后重试')
   }
 }
 
@@ -89,9 +94,17 @@ async function applyExpert() {
   }
 }
 
-onMounted(() => {
-  analysisStore.loadAnalyses().catch(() => {
-    /* 首屏错误已写进 store.error，页面会渲染错误态，这里不需要额外处理 */
+onMounted(async () => {
+  try {
+    await analysisStore.loadAnalyses()
+  } catch {
+    // 首屏错误已写进 store.error，页面会渲染错误态，这里不需要额外处理
+    return
+  }
+  // 解析列表到手后，一次性把所有评论拉全：
+  // 之后点开任意一条都是本地切换，展开即出内容，不会再有「等一下才冒出来」的闪动
+  analysisStore.loadAllComments(analysisStore.analyses.map((a) => a.id)).catch(() => {
+    /* loadAllComments 内部用 allSettled，单条失败已记进 commentsError */
   })
 })
 </script>
@@ -176,71 +189,86 @@ onMounted(() => {
           </el-button>
         </div>
 
-        <!-- 评论区：展开后才渲染。外层 comments-wrap 是容器，
-             .comments 才是横向排开的评论列表（卡片左右滚动），
+        <!-- 评论区：收起时不渲染（长列表不必白占 DOM）。展开即出内容 ——
+             评论在进页面时已一次性拉全，所以这里不再发请求。
+             外层 comments-wrap 是容器，.comments 是横向排开的评论列表（卡片左右滚动），
              输入框/升级入口在列表下方占满整行 -->
         <div v-if="expanded[item.id]" class="comments-wrap">
-          <div class="comments">
-            <div v-if="analysisStore.commentsOf(item.id).length === 0" class="empty-comment">
-              {{ lang === 'zh' ? '还没有人发表观点' : 'No comments yet' }}
-            </div>
-            <div v-for="c in analysisStore.commentsOf(item.id)" :key="c.id" class="comment">
-              <el-avatar :size="28">{{ c.nickname.charAt(0).toUpperCase() }}</el-avatar>
-              <div class="comment-body">
-                <div class="comment-head">
-                  <span class="cname">{{ c.nickname }}</span>
-                  <!-- 等级标签用发布当时的快照，不是用户现在的等级 -->
-                  <el-tag v-if="c.userLevel >= 2" size="small" type="warning" effect="light">
-                    行业专家
-                  </el-tag>
-                  <span class="ctime">{{ c.createdAt }}</span>
+          <!-- 这批评论拉取失败：如实说 + 给重试，不用「还没有人发表观点」糊过去 -->
+          <div v-if="analysisStore.commentsError[item.id]" class="comments-error">
+            <span>评论加载失败：{{ analysisStore.commentsError[item.id] }}</span>
+            <el-button size="small" type="primary" text @click="retryComments(item.id)">
+              重试
+            </el-button>
+          </div>
+          <template v-else>
+            <div class="comments">
+              <!-- 批量拉取还没回来时显示「加载中」：
+                   否则会先闪一句「还没有人发表观点」再变成列表，像抽了一下 -->
+              <div v-if="!analysisStore.commentsReady" class="empty-comment">
+                {{ lang === 'zh' ? '评论加载中…' : 'Loading…' }}
+              </div>
+              <div v-else-if="analysisStore.commentsOf(item.id).length === 0" class="empty-comment">
+                {{ lang === 'zh' ? '还没有人发表观点' : 'No comments yet' }}
+              </div>
+              <div v-for="c in analysisStore.commentsOf(item.id)" :key="c.id" class="comment">
+                <el-avatar :size="28">{{ c.nickname.charAt(0).toUpperCase() }}</el-avatar>
+                <div class="comment-body">
+                  <div class="comment-head">
+                    <span class="cname">{{ c.nickname }}</span>
+                    <!-- 等级标签用发布当时的快照，不是用户现在的等级 -->
+                    <el-tag v-if="c.userLevel >= 2" size="small" type="warning" effect="light">
+                      行业专家
+                    </el-tag>
+                    <span class="ctime">{{ c.createdAt }}</span>
+                  </div>
+                  <div class="ctext">{{ c.content }}</div>
                 </div>
-                <div class="ctext">{{ c.content }}</div>
               </div>
             </div>
-          </div>
 
-          <!-- 只有行业专家才看到输入框；其他人看到的是升级入口 -->
-          <div v-if="userStore.isExpert" class="compose">
-            <el-input
-              v-model="drafts[item.id]"
-              type="textarea"
-              :rows="2"
-              maxlength="500"
-              show-word-limit
-              placeholder="写下你的观点…"
-            />
-            <el-button
-              type="primary"
-              size="small"
-              class="send"
-              :loading="submitting[item.id]"
-              @click="submitComment(item.id)"
-            >
-              发表
-            </el-button>
-          </div>
-          <div v-else class="locked">
-            <span>{{
-              lang === 'zh'
-                ? '仅行业专家（Lv.2）可在此发表评论'
-                : 'Industry experts (Lv.2) only'
-            }}</span>
-            <!-- 未登录 → 先引导登录（applyExpert 需要 token，没登录点上去只会拿 401）；
-                 已登录但不是专家 → 引导申请升级 -->
-            <el-button
-              v-if="userStore.isLoggedIn"
-              size="small"
-              type="primary"
-              plain
-              @click="applyExpert"
-            >
-              {{ lang === 'zh' ? '申请成为专家' : 'Apply' }}
-            </el-button>
-            <el-button v-else size="small" type="primary" plain @click="router.push('/login')">
-              {{ lang === 'zh' ? '登录后可申请' : 'Login' }}
-            </el-button>
-          </div>
+            <!-- 只有行业专家才看到输入框；其他人看到的是升级入口 -->
+            <div v-if="userStore.isExpert" class="compose">
+              <el-input
+                v-model="drafts[item.id]"
+                type="textarea"
+                :rows="2"
+                maxlength="500"
+                show-word-limit
+                placeholder="写下你的观点…"
+              />
+              <el-button
+                type="primary"
+                size="small"
+                class="send"
+                :loading="submitting[item.id]"
+                @click="submitComment(item.id)"
+              >
+                发表
+              </el-button>
+            </div>
+            <div v-else class="locked">
+              <span>{{
+                lang === 'zh'
+                  ? '仅行业专家（Lv.2）可在此发表评论'
+                  : 'Industry experts (Lv.2) only'
+              }}</span>
+              <!-- 未登录 → 先引导登录（applyExpert 需要 token，没登录点上去只会拿 401）；
+                   已登录但不是专家 → 引导申请升级 -->
+              <el-button
+                v-if="userStore.isLoggedIn"
+                size="small"
+                type="primary"
+                plain
+                @click="applyExpert"
+              >
+                {{ lang === 'zh' ? '申请成为专家' : 'Apply' }}
+              </el-button>
+              <el-button v-else size="small" type="primary" plain @click="router.push('/login')">
+                {{ lang === 'zh' ? '登录后可申请' : 'Login' }}
+              </el-button>
+            </div>
+          </template>
         </div>
       </el-card>
     </div>
@@ -412,6 +440,19 @@ onMounted(() => {
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
+}
+/* 评论拉取失败：和「仅专家可评」同一套浅色提示条，右侧是重试按钮 */
+.comments-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 .locked {
   display: flex;
